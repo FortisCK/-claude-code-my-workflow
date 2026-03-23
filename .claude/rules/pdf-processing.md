@@ -39,7 +39,7 @@ done
 
 **Step 5: Selective Deep Reading**
 - After scanning all chunks, identify the most relevant sections
-- Only read those sections in detail for slide development
+- Only read those sections in detail for paper development
 - Skip appendices, references, or less relevant sections unless needed
 
 ## Error Handling Protocol

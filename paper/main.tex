@@ -1,0 +1,393 @@
+\documentclass[journal,twoside,web]{ieeecolor}
+\usepackage{generic}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{algorithm,algorithmic}
+\usepackage{hyperref}
+\hypersetup{hidelinks=true}
+\usepackage{textcomp}
+\usepackage{booktabs}
+\usepackage{multirow}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\markboth{\hskip25pc IEEE TRANSACTIONS AND JOURNALS TEMPLATE}
+{Author \MakeLowercase{\textit{et al.}}: Title}
+
+% Paths
+\graphicspath{{../figs/}}
+
+\begin{document}
+\title{Uncertainty-Aware Physio-Topological Semi-Supervised Learning for TAVI Landmark Detection and Coronary Safety Assessment}
+\author{First A. Author, \IEEEmembership{Fellow, IEEE}, Second B. Author, and Third C. Author Jr., \IEEEmembership{Member, IEEE}
+\thanks{This paragraph of the first footnote will contain the date on
+which you submitted your paper for review. It will also contain support
+information, including sponsor and financial support acknowledgment. For
+example, ``This work was supported in part by the U.S. Department of
+Commerce under Grant 123456.'' }
+\thanks{The next few paragraphs should contain
+the authors' current affiliations, including current address and e-mail. For
+example, First A. Author is with the National Institute of Standards and
+Technology, Boulder, CO 80305 USA (e-mail: author@boulder.nist.gov). }
+\thanks{Second B. Author Jr. was with Rice University, Houston, TX 77005 USA. He is
+now with the Department of Physics, Colorado State University, Fort Collins,
+CO 80523 USA (e-mail: author@lamar.colostate.edu).}
+\thanks{Third C. Author is with
+the Electrical Engineering Department, University of Colorado, Boulder, CO
+80309 USA, on leave from the National Research Institute for Metals,
+Tsukuba, Japan (e-mail: author@nrim.go.jp).}}
+
+\maketitle
+
+\begin{abstract}
+% TODO: Write abstract (150--250 words)
+\end{abstract}
+
+\begin{IEEEkeywords}
+Aortic root, coronary safety, landmark detection, semi-supervised learning, TAVI, topology
+\end{IEEEkeywords}
+
+% ============================================================================
+\section{Introduction}
+\label{sec:introduction}
+% ============================================================================
+
+% --- Paragraph 1: Clinical background ---
+\IEEEPARstart{T}{ranscatheter} aortic valve implantation (TAVI) has become the standard of care for patients with severe aortic stenosis across all surgical risk categories. Pre-procedural computed tomography (CT) planning requires precise identification of anatomical landmarks on the aortic root to determine valve sizing, guide catheter positioning, and assess procedural risk~\cite{Blanke2019_scct_tavi_ct}. Among these risks, coronary obstruction---though rare ($<$1\% incidence)---carries a mortality rate exceeding 50\% when it occurs~\cite{Ribeiro2013_coronary_obstruction}. Expert consensus guidelines identify a coronary ostium height below 10\,mm from the aortic annular plane as a primary risk factor~\cite{Holmes2012_tavr_consensus,Blanke2019_scct_tavi_ct}, yet this measurement presupposes accurate localization of both the annular plane landmarks and the coronary ostia themselves. A reliable, automated system that jointly localizes all clinically relevant aortic root landmarks---including the coronary ostia---would therefore directly support pre-procedural safety assessment.
+
+% --- Paragraph 2: Existing methods and Gaps 1--2 ---
+Existing deep learning methods for aortic root landmark detection operate in a fully supervised setting and typically focus on a subset of landmarks relevant to valve sizing. Ma et al.~\cite{Ma2023_aortic_landmarks} proposed a two-stage convolutional neural network (CNN) pipeline that detects eight landmarks with a mean radial error (MRE) of 2.23\,mm. Lalys et al.~\cite{Lalys2019_tavi_segmentation} combined aortic root segmentation with landmark identification, while Wang et al.~\cite{Wang2023_pretavr_dl} developed a segmentation-based algorithm for automated pre-TAVI CT assessment. However, none of these systems provides a unified framework that (i) extends the landmark set to include the coronary ostia as first-class outputs for coronary safety evaluation, and (ii) operates under label scarcity---a practical reality, since expert annotation of 3D CT volumes is time-consuming and requires specialized clinical knowledge, leaving the vast majority of available scans unlabeled.
+
+Semi-supervised learning (SSL) has achieved notable success in medical image segmentation, where consistency regularization~\cite{Tarvainen2017_mean_teacher,Laine2017_temporal_ensembling}, cross pseudo supervision (CPS)~\cite{Chen2021_cps}, and confidence-based filtering~\cite{Sohn2020_fixmatch} effectively leverage unlabeled data. Yet SSL for \emph{landmark detection} remains comparatively under-explored~\cite{Dong2019_teacher_students,Honari2018_ssl_landmarks,Kim2023_hybridmatch}. A fundamental reason is that the error tolerance differs qualitatively: in segmentation, a single mislabeled voxel is absorbed by surrounding correct predictions, whereas in landmark detection, one erroneous point can directly corrupt downstream clinical measurements---for instance, a 3\,mm error in coronary ostium localization may cause a clinically significant misclassification of coronary obstruction risk. Ren et al.~\cite{Ren2024_g2lcps} recently introduced CPS into landmark prediction, but their method does not incorporate anatomical structural constraints or address the imaging challenges specific to 3D aortic root CT, such as calcification-induced feature degradation.
+
+% --- Paragraph 3: Technical challenges and Gap 3 ---
+Aortic root CT imaging presents three interrelated technical challenges for landmark detection. First, heavy calcification of the aortic valve and surrounding structures degrades local image features, disproportionately affecting landmarks adjacent to calcified tissue (e.g., the membranous septum point $P_7$). Second, the ten aortic root landmarks exhibit strict anatomical spatial relationships---hinge points define the annular plane, commissures alternate with hinges around the root circumference, and coronary ostia maintain characteristic distances from the annulus---which an individual-landmark detector cannot enforce. Third, detection difficulty varies dramatically across landmarks: center-of-mass landmarks such as $P_6$ are inherently easier than ambiguous soft-tissue landmarks such as $P_7$. Graph neural networks~\cite{Scarselli2009_gnn,Kipf2017_gcn} and topology-aware approaches~\cite{Li2020_structured_landmark,Lang2020_gcn_landmark} can encode structural relationships among landmarks, but in a semi-supervised setting, unreliable pseudo-labels risk propagating errors through the graph's message-passing mechanism. Epistemic uncertainty estimation~\cite{Gal2016_dropout_uncertainty,Kendall2017_uncertainty} can identify unreliable predictions, and uncertainty-guided SSL methods~\cite{Yu2019_uncertainty_aware,Wang2022_u2pl} have shown promise in segmentation. However, existing approaches typically employ uncertainty for a single purpose---either to weight pseudo-labels \emph{or} to modulate features \emph{or} to inform post-hoc refinement---rather than as a coherent control signal that simultaneously coordinates multiple learning modules.
+
+% --- Paragraph 4: Our approach ---
+In this paper, we propose \textbf{T}opological \textbf{R}easoning and \textbf{U}ncertainty-aware \textbf{S}emi-supervised \textbf{T}eaching (\textbf{TRUST}), a two-stage framework for semi-supervised aortic root landmark detection. Stage~1 employs a frozen region-of-interest (ROI) proposal network to crop the aortic root from the full CT volume. Stage~2---where all methodological contributions reside---trains two structurally identical student networks via CPS, each paired with an exponential moving average (EMA) teacher. The key design principle of TRUST is \emph{unified directional uncertainty}: each EMA teacher produces per-landmark epistemic uncertainty estimates via test-time augmentation, and this single uncertainty signal is consumed by three downstream modules in a coordinated manner. (i)~In the \emph{CPS loss}, per-landmark reliability weights derived from uncertainty suppress the influence of unreliable pseudo-labels. (ii)~In the \emph{Uncertainty-Guided Heat Conduction Operator} (UG-HCO), uncertainty conditions the diffusivity of a physics-inspired frequency-domain feature propagation layer~\cite{wang2025building}: regions where the teacher is uncertain receive stronger global-context injection via increased diffusivity, compensating for calcification-induced feature degradation, while confident regions preserve fine-grained local detail. (iii)~In the \emph{Topo-GCN}, the same uncertainty gates message passing over the anatomical landmark graph, preventing poorly localized landmarks from corrupting their neighbors' representations. This ``estimate once, consume thrice'' design yields a coherent system in which uncertainty orchestrates learning across feature extraction, pseudo-supervision, and structural refinement, rather than serving as an isolated heuristic in any single module.
+
+% --- Paragraph 5: Contributions ---
+The main contributions of this paper are as follows:
+\begin{enumerate}
+  \item A unified 10-landmark detection framework for TAVI planning that extends beyond valve sizing to provide automated coronary safety assessment---specifically, coronary ostium height measurement---as a first-class clinical output, designed to operate under label scarcity.
+  \item TRUST, a semi-supervised learning framework in which a single epistemic uncertainty estimate simultaneously conditions feature extraction (UG-HCO), filters pseudo-labels (CPS loss weighting), and gates topological refinement (Topo-GCN message passing), forming a coordinated system rather than independent heuristics.
+  \item UG-HCO, an uncertainty-conditioned heat conduction operator that adaptively propagates global context into low-confidence regions via frequency-domain diffusion with uncertainty-modulated diffusivity, addressing calcification-induced feature degradation.
+  \item Comprehensive evaluation on 150 labeled and 600 unlabeled aortic root CT volumes, including per-landmark analysis, hard-case stratification by calcification severity, and uncertainty--error correlation analysis demonstrating that the unified uncertainty signal improves robustness on the most clinically challenging landmarks.
+\end{enumerate}
+
+% --- Paragraph 6: Paper organization ---
+The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews related work. Section~\ref{sec:method} details the TRUST methodology. Sections~\ref{sec:experiments} and~\ref{sec:discussion} present experimental results and discussion, respectively. Section~\ref{sec:conclusion} concludes the paper.
+
+% ============================================================================
+\section{Related Work}
+\label{sec:related}
+% ============================================================================
+
+% --- §2.1: TAVI Planning and Aortic Root Landmarking ---
+\subsection{TAVI Planning and Aortic Root Landmarking}
+
+TAVI requires pre-procedural CT-based measurements of the aortic root to determine prosthesis sizing, access route, and procedural risk~\cite{Blanke2019_scct_tavi_ct,Holmes2012_tavr_consensus}. Expert consensus documents identify key anatomical parameters---annular dimensions, sinus heights, coronary ostium heights, and sinotubular junction diameter---that must be extracted from the CT volume to guide device selection~\cite{Blanke2019_scct_tavi_ct}. Coronary obstruction, although rare, remains one of the most feared TAVI complications due to its high mortality~\cite{Ribeiro2013_coronary_obstruction}; its prevention relies critically on accurate coronary height measurement, which in turn requires localization of both the annular plane and the coronary ostia.
+
+Automated approaches to aortic root analysis have primarily focused on segmentation-based pipelines. Lalys et al.~\cite{Lalys2019_tavi_segmentation} proposed automatic aortic root segmentation with subsequent landmark identification for TAVI planning. Wang et al.~\cite{Wang2023_pretavr_dl} developed a fully automated deep learning algorithm for comprehensive pre-TAVI CT assessment of the aortic valvular complex, including risk factor detection. Taking a direct detection approach, Ma et al.~\cite{Ma2023_aortic_landmarks} proposed a two-stage CNN pipeline that directly detects eight aortic valve landmarks---three hinge points, three commissures, the aortic center, and the membranous septum point---achieving an MRE of 2.23\,mm in a fully supervised setting. However, these systems share two limitations: they either omit the coronary ostia from the landmark set (focusing on sizing-centric points) or address coronary measurements through separate segmentation rather than unified landmark-based inference, and they all require full annotation of the training data. Our work extends the landmark set to 10 points, explicitly incorporating the left and right coronary ostia to enable coronary height measurement as a first-class output, and operates under semi-supervised conditions to address annotation scarcity.
+
+% --- §2.2: Anatomical Landmark Detection ---
+\subsection{Anatomical Landmark Detection}
+
+Deep learning approaches to anatomical landmark detection broadly follow two strategies: heatmap regression and direct coordinate regression. In heatmap regression, a CNN predicts a spatial probability map for each landmark, with the peak indicating the predicted position. Payer et al.~\cite{Payer2019_integrating_spatial} integrated spatial configuration networks into heatmap regression, using a second-stage network to capture inter-landmark spatial relationships. Newell et al.~\cite{Newell2016_stacked_hourglass} introduced stacked hourglass networks that repeatedly process features through bottom-up and top-down pathways, enabling multi-scale reasoning. High-resolution representation networks (HRNet)~\cite{Sun2019_hrnet} maintain high-resolution features throughout the network, avoiding information loss from downsampling. In direct coordinate regression, approaches such as attention-guided deep regression~\cite{Zhong2019_attention_landmark} predict landmark coordinates through fully connected layers, sometimes enhanced with attention mechanisms.
+
+Three-dimensional medical landmark detection introduces additional challenges, including large volumetric search spaces and anisotropic voxel resolution. Zheng et al.~\cite{Zheng2015_3d_landmark} proposed one of the earliest 3D deep learning pipelines for efficient landmark detection in volumetric data, using a coarse-to-fine strategy. Ghesu et al.~\cite{Ghesu2017_multiscale_landmark} developed robust multi-scale landmark detection that handles incomplete 3D-CT data through reinforcement learning-based search. These coarse-to-fine paradigms motivate our two-stage design, where Stage~1 localizes the aortic root ROI before Stage~2 performs fine-grained landmark detection within the cropped volume.
+
+A common limitation of the above methods is that they treat each landmark independently or with limited pairwise constraints. When landmarks exhibit strong anatomical interdependencies---as in the aortic root, where hinge points, commissures, and coronary ostia maintain fixed topological relationships---independent detection can produce anatomically implausible configurations. This motivates the integration of graph-based structural reasoning (Section~\ref{sec:related_graph}).
+
+% --- §2.3: Semi-Supervised Learning in Medical Imaging ---
+\subsection{Semi-Supervised Learning in Medical Imaging}
+
+Semi-supervised learning aims to leverage unlabeled data alongside a small labeled set. In medical imaging, where expert annotation is expensive, SSL has achieved substantial gains, particularly in segmentation tasks. Core paradigms include consistency regularization, which encourages invariant predictions under input or model perturbations~\cite{Laine2017_temporal_ensembling,Tarvainen2017_mean_teacher}, and pseudo-labeling, which uses confident model predictions as surrogate annotations~\cite{Sohn2020_fixmatch}. Cross pseudo supervision (CPS)~\cite{Chen2021_cps} extends pseudo-labeling to dual-network architectures: two differently initialized networks provide pseudo-labels for each other, reducing confirmation bias inherent in self-training. Variants such as perturbed mean teachers~\cite{Liu2022_perturbed_mean_teacher} and unreliable pseudo-label exploitation~\cite{Wang2022_u2pl} further improve robustness.
+
+Despite these advances, SSL for \emph{landmark detection} remains limited. Honari et al.~\cite{Honari2018_ssl_landmarks} leveraged auxiliary face attributes to improve semi-supervised facial landmark localization. Dong and Yang~\cite{Dong2019_teacher_students} proposed a teacher-student framework that selectively supervises students using partially labeled facial images. Moskvyak et al.~\cite{Moskvyak2021_ssl_keypoints} explored semi-supervised keypoint localization with learned semantic representations. Kim et al.~\cite{Kim2023_hybridmatch} introduced HybridMatch, which combines heatmap and coordinate representations for semi-supervised facial landmark detection. Most recently, Ren et al.~\cite{Ren2024_g2lcps} proposed G2LCPS, bringing cross pseudo supervision to end-to-end landmark prediction with a global-to-local architecture. However, these methods operate predominantly on 2D natural images (faces, bodies) and do not incorporate domain-specific anatomical constraints or address the low-contrast, calcification-affected imaging conditions characteristic of 3D aortic root CT. Moreover, the fundamental error-propagation asymmetry between segmentation and landmark detection---where a single pseudo-label error can directly corrupt downstream clinical measurements---has received limited attention.
+
+% --- §2.4: Graph-Based Structural Reasoning ---
+\subsection{Graph-Based Structural Reasoning for Landmarks}
+\label{sec:related_graph}
+
+Graph neural networks (GNNs)~\cite{Scarselli2009_gnn,Kipf2017_gcn} provide a natural mechanism for encoding structural relationships among landmarks. Battaglia et al.~\cite{Battaglia2018_relational_inductive} formalized the role of relational inductive biases in deep learning, arguing that explicit graph structure enables more data-efficient learning of geometric configurations. In landmark detection, Li et al.~\cite{Li2020_structured_landmark} proposed topology-adapting deep graph learning, where a GCN refines landmark predictions by reasoning over a learned adjacency structure. Lang et al.~\cite{Lang2020_gcn_landmark} applied local attention-based graph convolution to cranio\-maxillo\-facial CBCT landmark localization, achieving improved accuracy through attention-weighted message passing among neighboring landmarks.
+
+These methods demonstrate that enforcing structural coherence among landmarks improves detection accuracy, particularly for landmarks that are individually ambiguous but constrained by their anatomical neighbors. However, they operate in fully supervised settings, where graph inputs are derived from ground-truth or high-quality initial predictions. In a semi-supervised regime, the graph receives noisy pseudo-label-derived coordinates from the teacher, and standard message passing risks propagating errors from unreliable landmarks to their neighbors. TRUST addresses this through uncertainty-gated message passing: the same per-landmark reliability weights that filter pseudo-labels also attenuate the contribution of uncertain landmarks during GCN updates, preventing error propagation through the anatomical graph.
+
+% --- §2.5: Uncertainty Estimation ---
+\subsection{Uncertainty Estimation in Deep Learning}
+
+Uncertainty estimation in deep learning distinguishes between \emph{aleatoric} uncertainty (inherent data noise) and \emph{epistemic} uncertainty (model ignorance due to limited training data)~\cite{Kendall2017_uncertainty}. Epistemic uncertainty, which decreases with more data, is particularly relevant in semi-supervised settings where labeled data is scarce. Common estimation techniques include Monte Carlo (MC) dropout~\cite{Gal2016_dropout_uncertainty}, deep ensembles~\cite{Lakshminarayanan2017_deep_ensembles}, and test-time augmentation (TTA), all of which measure prediction variance under stochastic perturbations.
+
+In semi-supervised medical image analysis, uncertainty has been employed primarily to improve pseudo-label quality. Yu et al.~\cite{Yu2019_uncertainty_aware} proposed an uncertainty-aware self-ensembling model for 3D left atrium segmentation, using MC dropout uncertainty to weight the consistency loss and exclude highly uncertain voxels from training. Wang et al.~\cite{Wang2022_u2pl} further demonstrated that pseudo-labels deemed unreliable by uncertainty can be repurposed as negative learning signals rather than discarded. These works apply uncertainty to a single mechanism (loss weighting or pseudo-label selection) and operate on dense segmentation tasks.
+
+In TRUST, we depart from this single-purpose paradigm by using a unified epistemic uncertainty estimate---derived from test-time augmentation of each EMA teacher---as a coordinated control signal across three distinct modules: CPS loss weighting, UG-HCO diffusivity conditioning, and Topo-GCN message-passing gating. This multi-consumer design ensures that uncertainty is not merely a post-hoc filter but an integral driver of the entire learning pipeline, from feature extraction through structural refinement.
+
+% ============================================================================
+\section{Method}
+\label{sec:method}
+% ============================================================================
+
+\subsection{Problem Formulation}
+Given a 3D CT volume $\mathbf{x} \in \mathbb{R}^{D \times H \times W}$, we aim to localize $K=10$ anatomical landmarks of the aortic root,
+\begin{equation}
+\mathcal{Y} = \{p_1, p_2, \ldots, p_K\}, \qquad p_k \in \mathbb{R}^3,
+\end{equation}
+where $p_k$ denotes the 3D coordinate of the $k$-th landmark (we use lowercase~$p_k$ for coordinates and uppercase~$P_k$ as landmark identifiers throughout). Compared with prior pipelines that focus on eight landmarks for valve sizing~\cite{Ma2023_aortic_landmarks}, we additionally include the left and right coronary ostia ($P_8$, $P_9$) to enable coronary height measurement for coronary safety assessment.
+
+We formulate landmark localization as a \emph{heatmap regression} problem. For each landmark $p_k$, the target heatmap $H_k^{*}$ is generated by a 3D Gaussian centered at $p_k$ with standard deviation $\sigma$:
+\begin{equation}
+H_k^{*}(v) = \exp\left(-\frac{\|v - p_k\|^2}{2\sigma^2}\right),
+\label{eq:heatmap}
+\end{equation}
+where $v$ indexes voxels in the heatmap space. During inference, landmark coordinates are obtained from predicted heatmaps via peak localization (e.g., $\arg\max$).
+
+We address this task in a semi-supervised setting with a labeled subset $\mathcal{D}_L = \{(\mathbf{x}_i, \mathcal{Y}_i)\}_{i=1}^{N_L}$ and a large unlabeled subset $\mathcal{D}_U = \{\mathbf{x}_i\}_{i=1}^{N_U}$, where $N_U \gg N_L$. Our goal is to leverage $\mathcal{D}_U$ to improve generalization for 10-landmark localization under limited annotations, especially for visually ambiguous landmarks and the newly introduced coronary ostia.
+
+\subsection{Framework Overview}
+\label{sec:overview}
+
+We propose \textbf{T}opological \textbf{R}easoning and \textbf{U}ncertainty-aware \textbf{S}emi-supervised \textbf{T}eaching (\textbf{TRUST}), a two-stage framework for semi-supervised aortic root landmark detection. Fig.~\ref{fig:framework} illustrates the overall architecture.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{framework_draft}
+\caption{Overview of the proposed TRUST framework. \textbf{Stage~1} (left): a frozen ROI proposal network crops and resamples the full CT volume into a fixed-size ROI. \textbf{Stage~2} (right): two structurally identical student--teacher pairs operate within the ROI space via cross pseudo supervision (CPS). Each student integrates uncertainty-guided heat conduction (UG-HCO) layers and a Topo-GCN refinement head. A unified directional uncertainty mechanism---estimated from each EMA teacher via TTA---simultaneously weights the CPS loss, conditions UG-HCO diffusivity, and gates GCN message passing.}
+\label{fig:framework}
+\end{figure*}
+
+\paragraph{Stage~1: Region-of-interest (ROI) proposal.}
+A coarse landmark detector $g_\psi$, following the two-stage pipeline of~\cite{Ma2023_aortic_landmarks}, operates on the full CT volume to produce a region-of-interest (ROI) center~$p_c$. The ROI is cropped and resampled to a fixed size $\mathbf{x}_{\mathrm{roi}} \in \mathbb{R}^{D' \times H' \times W'}$, within which all subsequent processing takes place. Stage~1 is pretrained on $\mathcal{D}_L$ and \emph{frozen} during Stage~2 training.
+
+\paragraph{Stage~2: TRUST.}
+Stage~2 operates entirely within the ROI coordinate space. Two structurally identical student networks, each paired with an exponential moving average (EMA) teacher, are trained via cross pseudo supervision (CPS)~\cite{Ren2024_g2lcps}: each teacher's heatmap predictions serve as pseudo-labels for the opposite student (Section~\ref{sec:cps}). Within each student, an uncertainty-guided heat conduction operator (UG-HCO) adapts feature propagation by increasing diffusivity in regions where the cross-teaching teacher is uncertain, compensating for calcification-induced feature degradation (Section~\ref{sec:ughco}). A lightweight graph convolutional network (Topo-GCN) then refines the predicted coordinates by reasoning over the anatomical landmark graph, enforcing structurally plausible configurations (Section~\ref{sec:gcn}). The epistemic uncertainty that drives these modules is estimated from each EMA teacher via test-time augmentation and consumed directionally: the same estimation methodology, applied to each teacher independently, simultaneously weights the CPS loss, conditions UG-HCO diffusivity, and gates GCN message passing (Section~\ref{sec:loss}).
+
+% ---------------------------------------------------------------------------
+\subsection{Cross Pseudo Supervision with Uncertainty Estimation}
+\label{sec:cps}
+
+\paragraph{Dual-network architecture.}
+Stage~2 employs two structurally identical student networks, $f_{\theta_1}$ and $f_{\theta_2}$, sharing the same architecture (stacked hourglass with feature pyramid network (FPN), UG-HCO layers, and a Topo-GCN refinement head) but initialized with different random weights. Each student has a corresponding exponential moving average (EMA) teacher~\cite{Tarvainen2017_mean_teacher}:
+\begin{equation}
+  \theta'_{j,n} = \alpha\,\theta'_{j,n-1} + (1-\alpha)\,\theta_{j,n}, \quad j \in \{1,2\},
+  \label{eq:ema}
+\end{equation}
+where $\alpha$ is the EMA decay rate. All four networks operate on the same ROI crop $\mathbf{x}_{\mathrm{roi}}$ produced by Stage~1.
+
+\paragraph{Cross pseudo supervision.}
+Following Ren et al.~\cite{Ren2024_g2lcps}, we adopt cross pseudo supervision (CPS) to exploit unlabeled data. On each unlabeled volume, Teacher~1's heatmap predictions serve as pseudo-labels for Student~2, and vice versa:
+\begin{align}
+  \hat{H}^{(T_1)} &= \mathrm{sg}\!\bigl(f_{\theta'_1}(\mathbf{x}_{\mathrm{roi}})\bigr) \;\to\; f_{\theta_2}, \notag\\
+  \hat{H}^{(T_2)} &= \mathrm{sg}\!\bigl(f_{\theta'_2}(\mathbf{x}_{\mathrm{roi}})\bigr) \;\to\; f_{\theta_1},
+  \label{eq:cps_scheme}
+\end{align}
+where $\hat{H}^{(T_j)}$ denotes the stop-gradient heatmap prediction from Teacher~$j$ and $\mathrm{sg}(\cdot)$ is the stop-gradient operator. Because the two students are differently initialized, their errors are partially decorrelated; cross-guidance thus reduces confirmation bias compared to self-training. A deliberate design choice in TRUST is to confine CPS entirely within Stage~2's ROI coordinate space: since CPS relies on heatmap-to-heatmap MSE, both networks must operate at the same spatial resolution and field of view, which is naturally satisfied within the ROI crop.
+
+\paragraph{Epistemic uncertainty estimation.}
+To prevent unreliable pseudo-labels from corrupting training---particularly for visually ambiguous landmarks such as $P_7$ under heavy calcification---we estimate per-landmark epistemic uncertainty from each EMA teacher via test-time augmentation (TTA). When Teacher~$j$ produces pseudo-labels, we apply $T$ stochastic augmentations $\{\tau_1, \ldots, \tau_T\}$ and collect its heatmap predictions ($m$ indexes augmentations):
+\begin{equation}
+  \hat{H}_k^{(j,m)} = f_{\theta'_j}\!\bigl(\tau_m(\mathbf{x}_{\mathrm{roi}})\bigr), \quad m = 1, \ldots, T.
+  \label{eq:tta_heatmaps}
+\end{equation}
+The predicted coordinate for each augmentation is obtained via differentiable soft-argmax, $\hat{p}_k^{(j,m)} = \mathrm{softargmax}\bigl(\hat{H}_k^{(j,m)}\bigr)$, and the per-landmark uncertainty is the spatial variance:
+\begin{equation}
+  u_k^{(j)} = \frac{1}{T}\sum_{m=1}^{T}\bigl\|\hat{p}_k^{(j,m)} - \bar{p}_k^{(j)}\bigr\|^2,
+  \quad \bar{p}_k^{(j)} = \frac{1}{T}\sum_{m=1}^{T}\hat{p}_k^{(j,m)}.
+  \label{eq:uncertainty}
+\end{equation}
+A high $u_k^{(j)}$ indicates that Teacher~$j$'s prediction for landmark~$k$ is sensitive to input perturbations, signaling low reliability. We convert this into a per-landmark reliability weight:
+\begin{equation}
+  w_k^{(j)} = \exp\!\bigl(-\alpha_u \cdot u_k^{(j)}\bigr),
+  \label{eq:weight}
+\end{equation}
+where $\alpha_u > 0$ is a sensitivity hyperparameter. As $u_k^{(j)} \to 0$, $w_k^{(j)} \to 1$ (full trust); as $u_k^{(j)}$ grows, $w_k^{(j)} \to 0$ (suppress). This directional uncertainty---the same estimation methodology applied to each teacher independently---serves as a unified reliability mechanism consumed by three downstream modules: (i)~the CPS loss for the corresponding direction (Section~\ref{sec:loss}), (ii)~the UG-HCO diffusivity in the receiving student (Section~\ref{sec:ughco}), and (iii)~the Topo-GCN message passing in the receiving student (Section~\ref{sec:gcn}).
+
+% ---------------------------------------------------------------------------
+\subsection{Uncertainty-Guided Heat Conduction Operator}
+\label{sec:ughco}
+
+Aortic root CT images frequently exhibit low contrast and calcification artifacts, degrading local feature quality for affected landmarks. Standard convolutional backbones process features at fixed receptive-field scales and cannot selectively enhance global context in degraded regions while preserving fine details elsewhere. We address this with an \emph{Uncertainty-Guided Heat Conduction Operator} (UG-HCO), integrated into both Stage~2 student networks (and consequently inherited by their EMA teachers). UG-HCO adapts the recently proposed heat-conduction-based feature propagation~\cite{wang2025building} by conditioning its diffusivity on the epistemic uncertainty from the cross-teaching direction (Section~\ref{sec:cps}).
+
+\paragraph{Heat conduction preliminaries.}
+The heat equation describes the diffusion of a scalar field $\varphi(\mathbf{r}, t)$ over spatial coordinates $\mathbf{r}$ and time~$t$:
+\begin{equation}
+  \frac{\partial \varphi}{\partial t} = \kappa\,\nabla^2 \varphi,
+  \label{eq:heat}
+\end{equation}
+where $\kappa > 0$ is the thermal diffusivity. Applying the Fourier transform yields a frequency-domain ordinary differential equation (ODE),
+\begin{equation}
+  \frac{\mathrm{d}\tilde{\varphi}(\boldsymbol{\omega},t)}{\mathrm{d}t}
+    = -\kappa\,\|\boldsymbol{\omega}\|^2\,\tilde{\varphi}(\boldsymbol{\omega},t),
+  \label{eq:heat_freq}
+\end{equation}
+with closed-form solution
+\begin{equation}
+  \tilde{\varphi}(\boldsymbol{\omega},t)
+    = \tilde{\varphi}_0(\boldsymbol{\omega})\,\exp\!\bigl(-\kappa\,\|\boldsymbol{\omega}\|^2\,t\bigr),
+  \label{eq:heat_sol}
+\end{equation}
+where $\tilde{\varphi}_0(\boldsymbol{\omega})$ is the initial condition in the frequency domain. Intuitively, higher frequencies decay faster, achieving an adaptive low-pass filtering whose strength is controlled by the product~$\kappa t$. Wang et al.~\cite{wang2025building} show that this operation can be implemented efficiently via the discrete cosine transform (DCT) under Neumann boundary conditions:
+\begin{equation}
+  \mathbf{U}_t = \mathrm{IDCT}\!\bigl(
+    \mathrm{DCT}(\mathbf{U}_0)
+    \odot \exp\!\bigl(-\kappa(\boldsymbol{\omega})\,\|\boldsymbol{\omega}\|^2\,t\bigr)
+  \bigr),
+  \label{eq:dct_hco}
+\end{equation}
+where $\mathbf{U}_0$ is the input feature map and $\kappa(\boldsymbol{\omega})$ is a learned, frequency-adaptive diffusivity predicted from frequency value embeddings (FVE).
+
+\paragraph{Uncertainty-conditioned diffusivity.}
+In vanilla HCO, $\kappa(\boldsymbol{\omega})$ depends only on frequency and is shared across all spatial locations. We extend this by conditioning the diffusivity on the per-landmark uncertainties $\{u_k\}_{k=1}^K$. Specifically, a normalized uncertainty map~$\bar{\mathcal{U}}$ is constructed by placing each normalized uncertainty~$u_k / \max_{k'} u_{k'}$ at the corresponding landmark location in a 3D volume and interpolating to the feature resolution via trilinear interpolation. The uncertainty-conditioned diffusivity is:
+\begin{equation}
+  \kappa(\boldsymbol{\omega}, \mathcal{U})
+    = \kappa_{\mathrm{base}}(\boldsymbol{\omega})\cdot
+      \bigl(1 + \beta\,\bar{\mathcal{U}}\bigr),
+  \label{eq:ughco_diff}
+\end{equation}
+where $\kappa_{\mathrm{base}}(\boldsymbol{\omega})$ is the standard FVE-predicted diffusivity, $\bar{\mathcal{U}}$ is the normalized, spatially broadcast uncertainty map, and $\beta$ is a learnable scaling parameter. The effect is intuitive: in regions where the teacher is uncertain (high~$\bar{\mathcal{U}}$, e.g., calcified areas around~$P_7$), diffusivity increases, promoting stronger global-context propagation that compensates for degraded local features. In confident regions (low~$\bar{\mathcal{U}}$), diffusivity remains close to the baseline, preserving fine-grained local detail. The UG-HCO layer replaces a standard convolutional block within the backbone and is trained end-to-end:
+\begin{equation}
+  \mathbf{U}_t = \mathrm{IDCT}\!\bigl(
+    \mathrm{DCT}(\mathbf{U}_0)
+    \odot \exp\!\bigl(-\kappa(\boldsymbol{\omega}, \mathcal{U})\,\|\boldsymbol{\omega}\|^2\,t\bigr)
+  \bigr).
+  \label{eq:ughco_layer}
+\end{equation}
+For 3D CT volumes, we employ the three-dimensional DCT, extending the formulation naturally to volumetric data.
+
+% ---------------------------------------------------------------------------
+\subsection{Topological Reasoning via Graph Refinement}
+\label{sec:gcn}
+
+Initial landmark predictions from the backbone may violate anatomical plausibility---for instance, predicting~$P_7$ outside the aortic root boundary due to calcification artifacts. Both Stage~2 students include a lightweight \emph{Topo-GCN} refinement head that enforces structural coherence by reasoning over the anatomical landmark graph~\cite{Li2020_structured_landmark}. Importantly, CPS supervision is applied at the heatmap level (before the GCN), so the GCN refines coordinates without coupling graph structure into the pseudo-label alignment.
+
+\paragraph{Graph construction.}
+We define a fixed graph $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ with $|\mathcal{V}| = K = 10$ nodes. Edges~$\mathcal{E}$ encode anatomical connectivity via a binary adjacency matrix~$A$: the aortic center~$P_6$ connects to all other landmarks; hinge points~$P_0$--$P_2$ and commissures~$P_3$--$P_5$ form the annular ring; each coronary ostium ($P_8$, $P_9$) connects to its nearest hinge and commissure pair; and the membranous septum point~$P_7$ connects to its anatomically adjacent landmarks ($P_0$, $P_1$, $P_3$, $P_6$). Each node receives an initial feature:
+\begin{equation}
+  \mathbf{h}_k^{(0)} = \mathrm{MLP}_{\mathrm{in}}\!\bigl(\hat{p}_k\bigr) \in \mathbb{R}^{d_h},
+  \label{eq:node_init}
+\end{equation}
+where $\hat{p}_k \in \mathbb{R}^3$ is the coordinate obtained from the backbone heatmap via differentiable soft-argmax and $d_h = 64$ is the hidden dimension.
+
+\paragraph{Uncertainty-gated message passing.}
+The GCN consists of $L = 4$ layers (${\sim}$32K parameters). At each layer, node features are updated as:
+\begin{equation}
+  \mathbf{h}_k^{(l+1)} = \sigma_{\mathrm{act}}\!\left(
+    \sum_{i \in \mathcal{N}(k)} \tilde{A}_{ki}\,w_i^{(\bar{j})}\,
+      \mathbf{W}^{(l)}\,\mathbf{h}_i^{(l)}
+    + \mathbf{W}_e^{(l)}\,\mathbf{e}_{ki}
+  \right),
+  \label{eq:gcn_mp}
+\end{equation}
+where $\tilde{A}_{ki}$ is the $(k,i)$-entry of the degree-normalized adjacency matrix with self-loops, $w_i^{(\bar{j})}$ (with $\bar{j} = 3-j$) is the reliability weight from the cross-teaching Teacher~$\bar{j}$~\eqref{eq:weight} used when updating Student~$j$'s GCN, $\mathbf{W}^{(l)}$ and $\mathbf{W}_e^{(l)}$ are learnable weight matrices, $\mathbf{e}_{ki} = \mathrm{MLP}_e(\hat{p}_k - \hat{p}_i)$ encodes relative position between connected landmarks, and $\sigma_{\mathrm{act}}(\cdot)$ is a nonlinear activation (ReLU). The reliability gating ensures that landmarks with high uncertainty (e.g., $P_7$ under calcification) contribute less to their neighbors' updates, while accurately detected landmarks such as $P_6$ (center, typically low error) and $P_0$--$P_2$ (hinge points) serve as reliable anchors.
+
+\paragraph{Gated residual coordinate correction.}
+After $L$ GCN layers, we predict a residual coordinate offset with a learned gate:
+\begin{align}
+  \Delta p_k &= \mathrm{MLP}_{\mathrm{out}}\!\bigl(\mathbf{h}_k^{(L)}\bigr), \quad
+  \gamma_k = \sigma_{\mathrm{gate}}\!\bigl(\mathbf{h}_k^{(L)}\bigr), \notag\\
+  p_k^{\mathrm{ref}} &= \hat{p}_k + \gamma_k \odot \Delta p_k,
+  \label{eq:residual}
+\end{align}
+where $\gamma_k \in (0,1)^3$ is a per-coordinate gate and $p_k^{\mathrm{ref}}$ is the refined coordinate. The residual formulation ensures that the GCN learns small corrections rather than absolute positions, and the gate allows the network to selectively apply or suppress refinement per coordinate axis. The entire pipeline---soft-argmax, GCN, and residual correction---is differentiable, enabling end-to-end training with gradients flowing back into the backbone.
+
+% ---------------------------------------------------------------------------
+\subsection{Loss Functions and Training}
+\label{sec:loss}
+
+\paragraph{Supervised loss.}
+On labeled data $\mathcal{D}_L$, each student~$j \in \{1,2\}$ minimizes a combination of heatmap regression and coordinate regression losses:
+\begin{equation}
+  \mathcal{L}_{\mathrm{sup}}^{(j)} = \frac{1}{K}\sum_{k=1}^{K}\Bigl(
+    \bigl\|H_k^{(j)} - H_k^*\bigr\|^2
+    + \lambda_p \bigl\|\hat{p}_k^{(j)} - p_k\bigr\|_1\Bigr),
+  \label{eq:loss_sup}
+\end{equation}
+where $H_k^{(j)}$ is the predicted heatmap of Student~$j$, $H_k^*$ is the Gaussian ground-truth heatmap from~\eqref{eq:heatmap}, $\hat{p}_k^{(j)}$ is the predicted coordinate (via soft-argmax), and $p_k$ is the ground-truth coordinate.
+
+\paragraph{Uncertainty-weighted CPS loss.}
+On unlabeled data $\mathcal{D}_U$, cross pseudo supervision enforces heatmap consistency between each student and the opposite teacher, weighted by the pseudo-label-producing teacher's reliability:
+\begin{align}
+  \mathcal{L}_{\mathrm{cps}} = \frac{1}{K}\sum_{k=1}^{K}\Bigl(&
+    w_k^{(1)}\bigl\|H_k^{(2)} - \hat{H}_k^{(T_1)}\bigr\|^2 \notag\\
+    &+ w_k^{(2)}\bigl\|H_k^{(1)} - \hat{H}_k^{(T_2)}\bigr\|^2
+  \Bigr),
+  \label{eq:loss_cps}
+\end{align}
+where $\hat{H}_k^{(T_j)}$ is Teacher~$j$'s stop-gradient heatmap prediction~\eqref{eq:cps_scheme} and $w_k^{(j)}$ is the reliability weight from~\eqref{eq:weight}. CPS is computed at the heatmap level, prior to the Topo-GCN, ensuring stable same-space supervision. The directional uncertainty weighting reduces the influence of noisy pseudo-labels for landmarks where the supervising teacher is uncertain.
+
+\paragraph{Topology refinement loss.}
+For labeled samples, we supervise the GCN-refined coordinates of both students:
+\begin{equation}
+  \mathcal{L}_{\mathrm{topo}}^{(j)} = \frac{1}{K}\sum_{k=1}^{K}
+    \bigl\|p_k^{\mathrm{ref},(j)} - p_k\bigr\|_1, \quad j \in \{1,2\}.
+  \label{eq:loss_topo}
+\end{equation}
+
+\paragraph{Total loss.}
+The overall training objective for Stage~2 combines all terms:
+\begin{equation}
+  \mathcal{L}_{\mathrm{total}} = \sum_{j=1}^{2}\mathcal{L}_{\mathrm{sup}}^{(j)}
+    + \lambda_c\,\rho(n)\,\mathcal{L}_{\mathrm{cps}}
+    + \lambda_t\sum_{j=1}^{2}\mathcal{L}_{\mathrm{topo}}^{(j)},
+  \label{eq:loss_total}
+\end{equation}
+where $\lambda_c$ and $\lambda_t$ are balancing coefficients, and $\rho(n) = \exp\!\bigl(-5(1 - n/n_{\max})^2\bigr)$ is a Gaussian ramp-up function that gradually increases the CPS weight over training epoch~$n$~\cite{Tarvainen2017_mean_teacher}.
+
+\paragraph{Training procedure.}
+Training proceeds in three phases:
+\begin{enumerate}
+  \item \emph{Stage~1 pretraining.} The ROI proposal network $g_\psi$ is trained on $\mathcal{D}_L$ with a supervised landmark loss. After convergence, $g_\psi$ is frozen.
+  \item \emph{Stage~2 warm-up.} Both students are trained on $\mathcal{D}_L$ using $\mathcal{L}_{\mathrm{sup}}^{(j)} + \lambda_t\,\mathcal{L}_{\mathrm{topo}}^{(j)}$ for $N_{\mathrm{warm}}$ epochs. EMA teachers are initialized as copies of their respective students.
+  \item \emph{Stage~2 main phase.} Each iteration samples a labeled mini-batch from $\mathcal{D}_L$ and an unlabeled mini-batch from $\mathcal{D}_U$. Each teacher produces $T$ stochastic predictions for uncertainty estimation (Section~\ref{sec:cps}), all loss terms in~\eqref{eq:loss_total} contribute to the student updates, and both teachers are updated via EMA~\eqref{eq:ema}.
+\end{enumerate}
+At inference, Stage~1 produces the ROI crop; a single Stage~2 student followed by its Topo-GCN yields the refined landmark coordinates within the ROI, which are reprojected to the original physical coordinate space for clinical measurements (e.g., coronary height).
+
+% ============================================================================
+\section{Experiments}
+\label{sec:experiments}
+% ============================================================================
+
+% TODO: Dataset description (150 labeled + 600 unlabeled CT volumes)
+% TODO: Implementation details
+% TODO: Evaluation metrics (MRE, SDR at 2/3/4 mm)
+% TODO: Comparison with baselines
+% TODO: Ablation study
+% TODO: Per-landmark analysis (P7 challenge, coronary ostia P8/P9)
+% TODO: Clinical validation (coronary height measurement)
+
+% ============================================================================
+\section{Discussion}
+\label{sec:discussion}
+% ============================================================================
+
+% TODO: Comparison with Ma et al. (2023) baseline
+% TODO: P7 (MS point) difficulty analysis — calcification, anatomy
+% TODO: Clinical implications for coronary safety
+% TODO: Limitations
+
+% ============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+% TODO: Summary and future work
+
+\section*{Acknowledgment}
+% TODO
+
+\bibliographystyle{IEEEtran}
+\bibliography{../Bibliography_base}
+
+\begin{IEEEbiographynophoto}{First A. Author}
+% TODO: Biography
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Second B. Author}
+% TODO: Biography
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Third C. Author Jr.}
+% TODO: Biography
+\end{IEEEbiographynophoto}
+
+\end{document}

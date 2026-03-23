@@ -1,53 +1,57 @@
 ---
 paths:
-  - "Slides/**/*.tex"
-  - "Quarto/**/*.qmd"
-  - "docs/**"
+  - "paper/**/*.tex"
+  - "figs/**/*"
 ---
 
 # Task Completion Verification Protocol
 
 **At the end of EVERY task, Claude MUST verify the output works correctly.** This is non-negotiable.
 
-## For Quarto/HTML Slides:
-1. Run `./scripts/sync_to_docs.sh` (or `./scripts/sync_to_docs.sh LectureN`) to render and deploy
-2. Open the HTML in browser: `open docs/slides/LectureX.html`
-3. Verify images display by reading 2-3 image files to confirm valid content
-4. Check HTML source for correct image paths
-5. Check for overflow by scanning dense slides
-6. Verify environment parity: every Beamer box environment has a CSS equivalent in the QMD
-7. Report verification results
+## For LaTeX Paper (.tex):
+1. Compile with pdflatex 3-pass + bibtex:
+   ```bash
+   cd paper && pdflatex -interaction=nonstopmode main.tex
+   BIBINPUTS=..:$BIBINPUTS bibtex main
+   pdflatex -interaction=nonstopmode main.tex
+   pdflatex -interaction=nonstopmode main.tex
+   ```
+2. Check for errors in the log output
+3. Grep for `Overfull \\hbox` warnings
+4. Grep for `undefined citations` or `Label(s) may have changed`
+5. Verify PDF was produced with correct page count
+6. Open PDF for visual verification: `open paper/main.pdf`
 
-## For LaTeX/Beamer Slides:
-1. Compile with xelatex and check for errors
-2. Open the PDF to verify figures render
-3. Check for overfull hbox warnings
+## For Figures:
+1. Verify all `\includegraphics` references point to existing files in `figs/`
+2. Check figure files are non-zero size
+3. Check format is appropriate (PDF for vector, PNG for raster)
+4. Verify figures are referenced in the paper text
 
-## For TikZ Diagrams in HTML/Quarto:
-1. Browsers **cannot** display PDF images inline — ALWAYS convert to SVG
-2. Use SVG (vector format) for crisp rendering: `pdf2svg input.pdf output.svg`
-3. **NEVER use PNG for diagrams** — PNG is raster and looks blurry
-4. Verify SVG files contain valid XML/SVG markup
-5. Copy SVGs to `docs/Figures/LectureX/` via `sync_to_docs.sh`
-6. **Freshness check:** Before using any TikZ SVG, verify extract_tikz.tex matches current Beamer source
+## For Python Scripts (.py):
+1. Run `python3 scripts/python/filename.py`
+2. Verify output figures were created in `figs/` with non-zero size
+3. Check for correct format and resolution
 
-## For R Scripts:
-1. Run `Rscript scripts/R/filename.R`
-2. Verify output files (PDF, RDS) were created with non-zero size
-3. Spot-check estimates for reasonable magnitude
+## For Bibliography:
+1. Verify all `\cite{}` keys in paper have entries in `Bibliography_base.bib`
+2. Check for orphan bibliography entries (entries not cited in paper)
+3. Verify no "undefined citation" warnings in LaTeX log
 
 ## Common Pitfalls:
-- **PDF images in HTML**: Browsers don't render PDFs inline → convert to SVG
-- **Relative paths**: `../Figures/` works from `Quarto/` but not from `docs/slides/` → use `sync_to_docs.sh`
-- **Assuming success**: Always verify output files exist AND contain correct content
-- **Stale TikZ SVGs**: extract_tikz.tex diverges from Beamer source → always diff-check
+- **Wrong compiler**: use `pdflatex` (not xelatex) for ieeecolor/IEEEtran
+- **Missing BIBINPUTS**: bibtex needs `BIBINPUTS=..:$BIBINPUTS` since `.bib` is in repo root
+- **Figure path mismatch**: `\includegraphics` paths must be relative to `paper/` directory
+- **Assuming success**: always verify output files exist AND contain correct content
 
 ## Verification Checklist:
 ```
-[ ] Output file created successfully
-[ ] No compilation/render errors
-[ ] Images/figures display correctly
-[ ] Paths resolve in deployment location (docs/)
-[ ] Opened in browser/viewer to confirm visual appearance
+[ ] Paper compiles without errors
+[ ] No overfull hbox warnings > 10pt
+[ ] All citations resolve
+[ ] All figure references resolve
+[ ] All cross-references resolve
+[ ] PDF produced at expected page count
+[ ] Opened in viewer to confirm visual appearance
 [ ] Reported results to user
 ```

@@ -1,5 +1,5 @@
 # ==============================================================================
-# .gitignore for Academic Claude Code Projects
+# .gitignore for TRUST Paper Project
 # ==============================================================================
 
 # LaTeX build artifacts
@@ -25,12 +25,21 @@
 __pycache__/
 *.pyc
 *.pyo
+*.egg-info/
+.venv/
+venv/
+*.egg
+dist/
+build/
+.pytest_cache/
 
-# R
-.Rproj.user/
-.Rhistory
-.RData
-.Rdata
+# Jupyter
+.ipynb_checkpoints/
+
+# Deep learning artifacts (if visualization scripts generate them)
+*.pth
+*.pt
+*.onnx
 
 # OS files
 .DS_Store
@@ -39,6 +48,14 @@ Thumbs.db
 # Claude Code local files (not shared across machines)
 .claude/settings.local.json
 .claude/state/
+large_tool_results/
+
+# Supporting paper PDFs (too large for git)
+master_supporting_docs/supporting_papers/*.pdf
+
+# Compiled paper PDF (regenerate via pdflatex)
+paper/main.pdf
+paper/*-converted-to.pdf
 
 # IDE
 .vscode/
@@ -46,10 +63,3 @@ Thumbs.db
 *.swp
 *.swo
 *~
-
-# Quarto rendering artifacts
-/.quarto/
-
-# Output artifacts — uncomment lines below based on your preference
-# *.rds
-# output/**/*.rds

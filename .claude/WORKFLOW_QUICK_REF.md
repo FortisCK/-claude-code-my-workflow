@@ -8,13 +8,13 @@
 
 ```
 Your instruction
-    ↓
-[PLAN] (if multi-file or unclear) → Show plan → Your approval
-    ↓
+    |
+[PLAN] (if multi-file or unclear) -> Show plan -> Your approval
+    |
 [EXECUTE] Implement, verify, done
-    ↓
+    |
 [REPORT] Summary + what's ready
-    ↓
+    |
 Repeat
 ```
 
@@ -23,8 +23,8 @@ Repeat
 ## I Ask You When
 
 - **Design forks:** "Option A (fast) vs. Option B (robust). Which?"
-- **Code ambiguity:** "Spec unclear on X. Assume Y?"
-- **Replication edge case:** "Just missed tolerance. Investigate?"
+- **Paper ambiguity:** "Spec unclear on X. Assume Y?"
+- **Metric edge case:** "SDR threshold mismatch. Investigate?"
 - **Scope question:** "Also refactor Y while here, or focus on X?"
 
 ---
@@ -32,10 +32,9 @@ Repeat
 ## I Just Execute When
 
 - Code fix is obvious (bug, pattern application)
-- Verification (tolerance checks, tests, compilation)
+- Verification (compilation, figure checks, bib validation)
 - Documentation (logs, commits)
-- Plotting (per established standards)
-- Deployment (after you approve, I ship automatically)
+- Figure generation (per established standards)
 
 ---
 
@@ -48,26 +47,22 @@ Repeat
 
 ---
 
-## Non-Negotiables (Customize These)
+## Non-Negotiables
 
-<!-- Replace with YOUR project's locked-in preferences -->
-
-- [YOUR PATH CONVENTION] (e.g., `here::here()` for R, relative paths for LaTeX)
-- [YOUR SEED CONVENTION] (e.g., `set.seed()` once at top for stochastic code)
-- [YOUR FIGURE STANDARDS] (e.g., white bg, 300 DPI, custom theme)
-- [YOUR COLOR PALETTE] (e.g., institutional colors)
-- [YOUR TOLERANCE THRESHOLDS] (e.g., 1e-6 for point estimates)
+- **Paths:** Relative paths from repo root for all files; `../Bibliography_base.bib` from `paper/`
+- **Seeds:** Random seeds set explicitly in Python scripts for reproducibility (`random.seed()`, `np.random.seed()`, `torch.manual_seed()`)
+- **Figure standards:** 300 DPI minimum, PDF/EPS for vector, PNG for raster, `bbox_inches='tight'`
+- **Color palette:** Colorblind-safe palette for all figures (use `seaborn` colorblind or custom accessible palette)
+- **Tolerance thresholds:** MRE in mm (report to 2 decimal places), SDR at 2mm/3mm/4mm thresholds
 
 ---
 
 ## Preferences
 
-<!-- Fill in as you discover your working style -->
-
-**Visual:** [How you want figures/plots handled]
-**Reporting:** [Concise bullets? Detailed prose? Details on request?]
+**Visual:** Publication-ready; IEEE TMI single-column (3.5in) or double-column (7.16in) widths
+**Reporting:** Concise bullets, details on request
 **Session logs:** Always (post-plan, incremental, end-of-session)
-**Replication:** [How strict? Flag near-misses?]
+**Reproducibility:** Strict -- all results must be traceable to specific configurations
 
 ---
 
@@ -76,11 +71,11 @@ Repeat
 For experimental work, use the **Fast-Track** workflow:
 - Work in `explorations/` folder
 - 60/100 quality threshold (vs. 80/100 for production)
-- No plan needed — just a research value check (2 min)
+- No plan needed -- just a research value check
 - See `.claude/rules/exploration-fast-track.md`
 
 ---
 
 ## Next Step
 
-You provide task → I plan (if needed) → Your approval → Execute → Done.
+You provide task -> I plan (if needed) -> Your approval -> Execute -> Done.

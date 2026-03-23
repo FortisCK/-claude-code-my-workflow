@@ -1,65 +1,50 @@
 ---
 name: verifier
-description: End-to-end verification agent. Checks that slides compile, render, deploy, and display correctly. Use proactively before committing or creating PRs.
+description: End-to-end verification agent. Checks that paper compiles, figures resolve, and bibliography is complete. Use proactively before committing or creating PRs.
 tools: Read, Grep, Glob, Bash
 model: inherit
 ---
 
-You are a verification agent for academic course materials.
+You are a verification agent for an academic paper project (IEEE TMI).
 
 ## Your Task
 
-For each modified file, verify that the appropriate output works correctly. Run actual compilation/rendering commands and report pass/fail results.
+For each modified file, verify that the appropriate output works correctly. Run actual compilation commands and report pass/fail results.
 
 ## Verification Procedures
 
-### For `.tex` files (Beamer slides):
+### For `.tex` files (paper):
 ```bash
-cd Slides
-TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode FILENAME.tex 2>&1 | tail -20
+cd paper
+pdflatex -interaction=nonstopmode main.tex 2>&1 | tail -20
+BIBINPUTS=..:$BIBINPUTS bibtex main 2>&1 | tail -10
+pdflatex -interaction=nonstopmode main.tex 2>&1 | tail -20
+pdflatex -interaction=nonstopmode main.tex 2>&1 | tail -20
 ```
 - Check exit code (0 = success)
-- Grep for `Overfull \\hbox` warnings — count them
-- Grep for `undefined citations` — these are errors
-- Verify PDF was generated: `ls -la FILENAME.pdf`
+- Grep for `Overfull \\hbox` warnings -- count them
+- Grep for `undefined citations` -- these are errors
+- Verify PDF was generated: `ls -la main.pdf`
+- Check page count with `pdfinfo main.pdf | grep Pages`
 
-### For `.qmd` files (Quarto slides):
+### For figure references:
+- Scan all `.tex` files for `\includegraphics` commands
+- Extract file paths and verify each exists in `figs/`
+- Check file sizes > 0
+- Verify format is appropriate (PDF for vector, PNG for raster)
+
+### For `.py` files (visualization scripts):
 ```bash
-./scripts/sync_to_docs.sh LectureN 2>&1 | tail -20
+python3 scripts/python/FILENAME.py 2>&1 | tail -20
 ```
 - Check exit code
-- Verify HTML output exists in `docs/slides/`
-- Check for render warnings
-- **Plotly verification**: grep for `htmlwidget` count in rendered HTML
-- **Environment parity**: scan QMD for all `::: {.classname}` and verify each class exists in the theme SCSS
-
-### For `.R` files (R scripts):
-```bash
-Rscript scripts/R/FILENAME.R 2>&1 | tail -20
-```
-- Check exit code
-- Verify output files (PDF, RDS) were created
+- Verify output figures were created in `figs/`
 - Check file sizes > 0
 
-### For `.svg` files (TikZ diagrams):
-- Read the file and check it starts with `<?xml` or `<svg`
-- Verify file size > 100 bytes (not empty/corrupted)
-- Check that corresponding references in QMD files point to existing files
-
-### TikZ Freshness Check (MANDATORY):
-**Before verifying any QMD that references TikZ SVGs:**
-1. Read the Beamer `.tex` file — extract all `\begin{tikzpicture}` blocks
-2. Read `Figures/LectureN/extract_tikz.tex` — extract all tikzpicture blocks
-3. Compare each block
-4. Report: `FRESH` or `STALE — N diagrams differ`
-
-### For deployment (`docs/` directory):
-- Check that `docs/slides/` contains the expected HTML files
-- Check that `docs/Figures/` is synced with `Figures/`
-- Verify image paths in HTML resolve to existing files
-
 ### For bibliography:
-- Check that all `\cite` / `@key` references in modified files have entries in the .bib file
+- Extract all `\cite{}` keys from paper `.tex` files
+- Check each key exists in `Bibliography_base.bib`
+- Report any undefined citations
 
 ## Report Format
 
@@ -71,9 +56,8 @@ Rscript scripts/R/FILENAME.R 2>&1 | tail -20
 - **Warnings:** N overfull hbox, N undefined citations
 - **Output exists:** Yes / No
 - **Output size:** X KB / X MB
-- **TikZ freshness:** FRESH / STALE (N diagrams differ)
-- **Plotly charts:** N detected (expected: M)
-- **Environment parity:** All matched / Missing: [list]
+- **Page count:** N pages
+- **Figure references:** N total, N resolved, N broken
 
 ### Summary
 - Total files checked: N
@@ -83,8 +67,8 @@ Rscript scripts/R/FILENAME.R 2>&1 | tail -20
 ```
 
 ## Important
-- Run verification commands from the correct working directory
-- Use `TEXINPUTS` and `BIBINPUTS` environment variables for LaTeX
+- Run compilation from the `paper/` directory
+- Use `BIBINPUTS=..:$BIBINPUTS` for bibtex (bib file is in repo root)
 - Report ALL issues, even minor warnings
-- If a file fails to compile/render, capture and report the error message
-- TikZ freshness is a HARD GATE — stale SVGs should be flagged as failures
+- If a file fails to compile, capture and report the error message
+- Broken figure references are HARD GATES -- flag as failures

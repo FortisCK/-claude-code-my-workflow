@@ -22,6 +22,8 @@ fi
 PROTECTED_PATTERNS=(
   "Bibliography_base.bib"
   "settings.json"
+  "ieeecolor.cls"
+  "generic.sty"
 )
 
 BASENAME=$(basename "$FILE")
