@@ -1,12 +1,7 @@
-# CLAUDE.MD -- Academic Project Development with Claude Code
+# CLAUDE.MD -- Master's Thesis Evaluation with Claude Code
 
-<!-- HOW TO USE: Replace [BRACKETED PLACEHOLDERS] with your project info.
-     Customize Beamer environments and CSS classes for your theme.
-     Keep this file under ~150 lines — Claude loads it every session.
-     See the guide at docs/workflow-guide.html for full documentation. -->
-
-**Project:** [YOUR PROJECT NAME]
-**Institution:** [YOUR INSTITUTION]
+**Project:** Master's Thesis Evaluation — CS/AI
+**Institution:** TBD
 **Branch:** main
 
 ---
@@ -14,9 +9,9 @@
 ## Core Principles
 
 - **Plan first** -- enter plan mode before non-trivial tasks; save plans to `quality_reports/plans/`
-- **Verify after** -- compile/render and confirm output at the end of every task
-- **Single source of truth** -- Beamer `.tex` is authoritative; Quarto `.qmd` derives from it
-- **Quality gates** -- nothing ships below 80/100
+- **Verify after** -- check evaluation reports for completeness and accuracy at the end of every task
+- **Read-only by default** -- the student's thesis .tex files are the source of truth; produce evaluation reports, never edit source files without explicit permission
+- **Quality gates** -- no evaluation report ships below 80/100
 - **[LEARN] tags** -- when corrected, save `[LEARN:category] wrong → right` to MEMORY.md
 
 ---
@@ -24,20 +19,25 @@
 ## Folder Structure
 
 ```
-[YOUR-PROJECT]/
+claude-code-my-workflow/
 ├── CLAUDE.MD                    # This file
 ├── .claude/                     # Rules, skills, agents, hooks
-├── Bibliography_base.bib        # Centralized bibliography
-├── Figures/                     # Figures and images
-├── Preambles/header.tex         # LaTeX headers
-├── Slides/                      # Beamer .tex files
-├── Quarto/                      # RevealJS .qmd files + theme
-├── docs/                        # GitHub Pages (auto-generated)
-├── scripts/                     # Utility scripts + R code
-├── quality_reports/             # Plans, session logs, merge reports
-├── explorations/                # Research sandbox (see rules)
+├── Thesis/                      # Student's LaTeX source (READ-ONLY)
+├── Bibliography_base.bib        # Reference bibliography
+├── Figures/                     # Extracted figures for analysis
+├── master_supporting_docs/      # Reference papers, guidelines, rubrics
+│   ├── supporting_papers/       # Related papers for citation checking
+│   └── supporting_slides/       # Defense slides (if applicable)
+├── quality_reports/             # Plans, session logs, evaluation outputs
+│   ├── plans/                   # Saved plans
+│   ├── session_logs/            # Session logs
+│   ├── thesis_evaluation/       # Evaluation reports (our output)
+│   └── merges/                  # Merge reports
+├── explorations/                # Research sandbox (analysis, experiments)
+├── scripts/                     # Utility scripts + analysis code
+│   └── R/                       # R scripts for data/figure analysis
 ├── templates/                   # Session log, quality report templates
-└── master_supporting_docs/      # Papers and existing slides
+└── docs/                        # Generated outputs
 ```
 
 ---
@@ -45,17 +45,14 @@
 ## Commands
 
 ```bash
-# LaTeX (3-pass, XeLaTeX only)
-cd Slides && TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode file.tex
-BIBINPUTS=..:$BIBINPUTS bibtex file
-TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode file.tex
-TEXINPUTS=../Preambles:$TEXINPUTS xelatex -interaction=nonstopmode file.tex
+# Compile thesis (verify it builds)
+cd Thesis && latexmk -xelatex -interaction=nonstopmode main.tex
 
-# Deploy Quarto to GitHub Pages
-./scripts/sync_to_docs.sh LectureN
+# Run quality score on evaluation report
+python3 scripts/quality_score.py quality_reports/thesis_evaluation/report.md
 
-# Quality score
-python scripts/quality_score.py Quarto/file.qmd
+# Check bibliography
+cd Thesis && bibtex main
 ```
 
 ---
@@ -64,9 +61,9 @@ python scripts/quality_score.py Quarto/file.qmd
 
 | Score | Gate | Meaning |
 |-------|------|---------|
-| 80 | Commit | Good enough to save |
-| 90 | PR | Ready for deployment |
-| 95 | Excellence | Aspirational |
+| 80 | Commit | Evaluation report good enough to save |
+| 90 | PR | Ready for advisor review |
+| 95 | Excellence | Publishable-quality feedback |
 
 ---
 
@@ -74,60 +71,35 @@ python scripts/quality_score.py Quarto/file.qmd
 
 | Command | What It Does |
 |---------|-------------|
-| `/compile-latex [file]` | 3-pass XeLaTeX + bibtex |
-| `/deploy [LectureN]` | Render Quarto + sync to docs/ |
-| `/extract-tikz [LectureN]` | TikZ → PDF → SVG |
-| `/proofread [file]` | Grammar/typo/overflow review |
-| `/visual-audit [file]` | Slide layout audit |
-| `/pedagogy-review [file]` | Narrative, notation, pacing review |
-| `/review-r [file]` | R code quality review |
-| `/qa-quarto [LectureN]` | Adversarial Quarto vs Beamer QA |
-| `/slide-excellence [file]` | Combined multi-agent review |
-| `/translate-to-quarto [file]` | Beamer → Quarto translation |
-| `/validate-bib` | Cross-reference citations |
-| `/devils-advocate` | Challenge slide design |
-| `/create-lecture` | Full lecture creation |
-| `/commit [msg]` | Stage, commit, PR, merge |
-| `/lit-review [topic]` | Literature search + synthesis |
-| `/research-ideation [topic]` | Research questions + strategies |
-| `/interview-me [topic]` | Interactive research interview |
-| `/review-paper [file]` | Manuscript review |
-| `/data-analysis [dataset]` | End-to-end R analysis |
+| `/review-paper [file]` | **Primary** — Full thesis/chapter evaluation |
+| `/proofread [file]` | Grammar/typo/notation review of thesis |
+| `/validate-bib` | Cross-reference thesis citations |
+| `/lit-review [topic]` | Literature search for missing references |
+| `/research-ideation [topic]` | Generate research improvement suggestions |
+| `/interview-me [topic]` | Interactive deep-dive on thesis topics |
+| `/compile-latex [file]` | Verify thesis compiles |
+| `/review-r [file]` | Review thesis R/Python code |
+| `/data-analysis [dataset]` | Analyze thesis datasets |
+| `/commit [msg]` | Stage, commit, push evaluation work |
+| `/devils-advocate` | Challenge thesis arguments |
 
 ---
 
-<!-- CUSTOMIZE: Replace the example entries below with your own
-     Beamer environments and Quarto CSS classes. These are examples
-     from the original project — delete them and add yours. -->
+## Evaluation Dimensions (CS/AI Thesis)
 
-## Beamer Custom Environments
-
-| Environment       | Effect        | Use Case       |
-|-------------------|---------------|----------------|
-| `[your-env]`      | [Description] | [When to use]  |
-
-<!-- Example entries (delete and replace with yours):
-| `keybox` | Gold background box | Key points |
-| `highlightbox` | Gold left-accent box | Highlights |
-| `definitionbox[Title]` | Blue-bordered titled box | Formal definitions |
--->
-
-## Quarto CSS Classes
-
-| Class              | Effect        | Use Case       |
-|--------------------|---------------|----------------|
-| `[.your-class]`    | [Description] | [When to use]  |
-
-<!-- Example entries (delete and replace with yours):
-| `.smaller` | 85% font | Dense content slides |
-| `.positive` | Green bold | Good annotations |
--->
+| Dimension | Key Questions |
+|-----------|--------------|
+| Problem & Motivation | Clear research question? Well-motivated? Novel contribution? |
+| Technical Approach | Sound methodology? Correct proofs/algorithms? Appropriate complexity? |
+| Experimental Design | Fair baselines? Proper metrics? Statistical significance? Reproducible? |
+| Literature Review | Complete coverage? Accurate characterization? Clear positioning? |
+| Writing Quality | Clear prose? Consistent notation? Logical flow? No typos? |
+| Presentation | Good figures/tables? Self-contained captions? Appropriate length? |
 
 ---
 
 ## Current Project State
 
-| Lecture | Beamer | Quarto | Key Content |
-|---------|--------|--------|-------------|
-| 1: [Topic] | `Lecture01_Topic.tex` | `Lecture1_Topic.qmd` | [Brief description] |
-| 2: [Topic] | `Lecture02_Topic.tex` | -- | [Brief description] |
+| Chapter | File | Status | Key Content |
+|---------|------|--------|-------------|
+| *Thesis not yet imported* | -- | Pending | Awaiting upload to `Thesis/` |

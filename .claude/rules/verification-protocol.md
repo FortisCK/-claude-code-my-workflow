@@ -1,53 +1,53 @@
 ---
 paths:
-  - "Slides/**/*.tex"
-  - "Quarto/**/*.qmd"
-  - "docs/**"
+  - "Thesis/**/*.tex"
+  - "quality_reports/**"
 ---
 
 # Task Completion Verification Protocol
 
-**At the end of EVERY task, Claude MUST verify the output works correctly.** This is non-negotiable.
+**At the end of EVERY task, Claude MUST verify the output is correct.** This is non-negotiable.
 
-## For Quarto/HTML Slides:
-1. Run `./scripts/sync_to_docs.sh` (or `./scripts/sync_to_docs.sh LectureN`) to render and deploy
-2. Open the HTML in browser: `open docs/slides/LectureX.html`
-3. Verify images display by reading 2-3 image files to confirm valid content
-4. Check HTML source for correct image paths
-5. Check for overflow by scanning dense slides
-6. Verify environment parity: every Beamer box environment has a CSS equivalent in the QMD
-7. Report verification results
+## For Thesis Evaluation Reports:
+1. Verify the report covers all required evaluation dimensions
+2. Check that specific thesis locations (chapter, section, page, equation) are cited for each issue
+3. Verify severity classifications are consistent (CRITICAL / MAJOR / MINOR)
+4. Confirm constructive suggestions accompany every criticism
+5. Save to `quality_reports/thesis_evaluation/`
 
-## For LaTeX/Beamer Slides:
-1. Compile with xelatex and check for errors
-2. Open the PDF to verify figures render
-3. Check for overfull hbox warnings
+## For Thesis Compilation Checks:
+1. Run `cd Thesis && latexmk -xelatex -interaction=nonstopmode main.tex` (or the appropriate entry file)
+2. Check for compilation errors and undefined references
+3. Verify bibliography resolves (no missing citations)
+4. Report any overfull hbox warnings
 
-## For TikZ Diagrams in HTML/Quarto:
-1. Browsers **cannot** display PDF images inline — ALWAYS convert to SVG
-2. Use SVG (vector format) for crisp rendering: `pdf2svg input.pdf output.svg`
-3. **NEVER use PNG for diagrams** — PNG is raster and looks blurry
-4. Verify SVG files contain valid XML/SVG markup
-5. Copy SVGs to `docs/Figures/LectureX/` via `sync_to_docs.sh`
-6. **Freshness check:** Before using any TikZ SVG, verify extract_tikz.tex matches current Beamer source
+## For Proofreading Reports:
+1. Ensure every issue has: location, current text, suggested fix, category
+2. Verify suggestions are grammatically correct themselves
+3. Report saved to `quality_reports/`
 
-## For R Scripts:
-1. Run `Rscript scripts/R/filename.R`
-2. Verify output files (PDF, RDS) were created with non-zero size
-3. Spot-check estimates for reasonable magnitude
+## For Literature Analysis:
+1. Verify cited papers exist and are correctly attributed
+2. Cross-reference with `Bibliography_base.bib` and `master_supporting_docs/`
+3. Spot-check DOIs or titles for accuracy
+
+## For Code/Script Reviews (if thesis includes code):
+1. Run scripts to verify they execute without errors
+2. Check reproducibility (set.seed, fixed random states)
+3. Verify output files are created at expected paths
 
 ## Common Pitfalls:
-- **PDF images in HTML**: Browsers don't render PDFs inline → convert to SVG
-- **Relative paths**: `../Figures/` works from `Quarto/` but not from `docs/slides/` → use `sync_to_docs.sh`
-- **Assuming success**: Always verify output files exist AND contain correct content
-- **Stale TikZ SVGs**: extract_tikz.tex diverges from Beamer source → always diff-check
+- **Fabricating details**: Never claim a thesis says something without reading it
+- **Vague feedback**: Always cite specific locations (Ch. 3, Sec. 3.2, Eq. 7, Table 4)
+- **Missing context**: Read surrounding sections before flagging an issue
+- **Overlooking strengths**: Every review should acknowledge what the thesis does well
 
 ## Verification Checklist:
 ```
-[ ] Output file created successfully
-[ ] No compilation/render errors
-[ ] Images/figures display correctly
-[ ] Paths resolve in deployment location (docs/)
-[ ] Opened in browser/viewer to confirm visual appearance
+[ ] Output report is complete and saved
+[ ] Every issue cites a specific thesis location
+[ ] Severity levels are appropriate and consistent
+[ ] Constructive suggestions provided
+[ ] No fabricated claims or hallucinated content
 [ ] Reported results to user
 ```

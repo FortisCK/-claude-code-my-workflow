@@ -1,69 +1,52 @@
 ---
 paths:
-  - "Figures/**/*"
-  - "Quarto/**/*.qmd"
-  - "Slides/**/*.tex"
+  - "Thesis/**/*.tex"
+  - "quality_reports/**"
 ---
 
-# Single Source of Truth: Enforcement Protocol
+# Single Source of Truth: Thesis Evaluation Protocol
 
-**The Beamer `.tex` file is the authoritative source for ALL content.** Everything else is derived.
+**The student's thesis `.tex` files in `Thesis/` are READ-ONLY.** Our output is evaluation reports, not edits.
 
-## The SSOT Chain
+## The Source Chain
 
 ```
-Beamer .tex (SOURCE OF TRUTH)
-  ├── extract_tikz.tex → PDF → SVGs (derived)
-  ├── Quarto .qmd → HTML (derived)
-  ├── Bibliography_base.bib (shared)
-  └── Figures/LectureN/*.rds → plotly charts (data source)
+Thesis/*.tex (STUDENT'S SOURCE — READ-ONLY)
+  ├── quality_reports/thesis_evaluation/  (our evaluation output)
+  ├── quality_reports/session_logs/       (session tracking)
+  ├── Bibliography_base.bib              (reference bibliography)
+  └── master_supporting_docs/            (reference papers)
 
-NEVER edit derived artifacts independently.
-ALWAYS propagate changes from source → derived.
+NEVER edit thesis source files without explicit advisor permission.
+ALWAYS produce evaluation reports as separate documents.
 ```
-
----
-
-## TikZ Freshness Protocol (MANDATORY)
-
-**Before using ANY TikZ SVG in a Quarto slide, verify it matches the current Beamer source.**
-
-### Diff-Check Procedure
-
-1. Read the TikZ block from the Beamer `.tex` file
-2. Read the corresponding block from `Figures/LectureN/extract_tikz.tex`
-3. Compare EVERY coordinate, label, color, opacity, and anchor point
-4. If ANY difference exists: update `extract_tikz.tex` from Beamer, recompile, regenerate SVGs
-5. Only then reference the SVG in the QMD
-
-### When to Re-Extract
-
-Re-extract ALL TikZ diagrams when:
-- The Beamer `.tex` file has been modified since last extraction
-- Starting a new Quarto translation
-- Any TikZ-related quality issue is reported
-- Before any commit that includes QMD changes
 
 ---
 
-## Environment Parity (MANDATORY)
+## Read-Only Enforcement
 
-**Every Beamer environment MUST have a CSS equivalent before translation begins.**
-
-1. Scan the Beamer source for all custom environments
-2. Check each against your theme SCSS file
-3. If ANY environment is missing from SCSS, create it BEFORE translating
+1. Thesis .tex files are protected by `.claude/hooks/protect-files.sh`
+2. If a source edit is needed (e.g., to test a fix), ask the advisor first
+3. Evaluation reports go to `quality_reports/thesis_evaluation/`
+4. Proofreading reports go to `quality_reports/`
 
 ---
 
-## Content Fidelity Checklist
+## Evaluation Report Standards
 
-```
-[ ] Frame count: Beamer frames == Quarto slides
-[ ] Math check: every equation appears with identical notation
-[ ] Citation check: every \cite has a @key in Quarto
-[ ] Environment check: every Beamer box has CSS equivalent
-[ ] Figure check: every \includegraphics has SVG or plotly equivalent
-[ ] No added content: Quarto does not invent slides not in Beamer
-[ ] No dropped content: every Beamer idea appears in Quarto
-```
+Each evaluation report must:
+- Reference specific thesis locations (chapter, section, page, equation number)
+- Classify issues by severity (CRITICAL / MAJOR / MINOR)
+- Provide constructive suggestions for every issue raised
+- Acknowledge thesis strengths, not just weaknesses
+- Be suitable for sharing with the student
+
+---
+
+## Citation Cross-Reference
+
+When checking thesis citations:
+1. Read the thesis bibliography (.bib file in `Thesis/`)
+2. Cross-reference with `Bibliography_base.bib` (our reference copy)
+3. Check papers in `master_supporting_docs/supporting_papers/` for accuracy
+4. Flag missing key references, miscited results, or attribution errors

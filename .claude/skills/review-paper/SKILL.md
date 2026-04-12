@@ -1,16 +1,16 @@
 ---
 name: review-paper
-description: Comprehensive manuscript review covering argument structure, econometric specification, citation completeness, and potential referee objections
+description: Comprehensive thesis/manuscript review covering argument structure, technical correctness, experimental methodology, citation completeness, and blind-review readiness
 disable-model-invocation: true
-argument-hint: "[paper filename in master_supporting_docs/ or path to .tex/.pdf]"
+argument-hint: "[thesis file in Thesis/ or paper in master_supporting_docs/]"
 allowed-tools: ["Read", "Grep", "Glob", "Write", "Task"]
 ---
 
-# Manuscript Review
+# Thesis / Manuscript Review
 
-Produce a thorough, constructive review of an academic manuscript — the kind of report a top-journal referee would write.
+Produce a thorough, constructive review — the kind of report a senior PC member at a top CS/AI venue would write.
 
-**Input:** `$ARGUMENTS` — path to a paper (.tex, .pdf, or .qmd), or a filename in `master_supporting_docs/`.
+**Input:** `$ARGUMENTS` — path to a thesis chapter (.tex, .pdf), or a filename in `Thesis/` or `master_supporting_docs/`.
 
 ---
 
@@ -18,18 +18,19 @@ Produce a thorough, constructive review of an academic manuscript — the kind o
 
 1. **Locate and read the manuscript.** Check:
    - Direct path from `$ARGUMENTS`
+   - `Thesis/$ARGUMENTS`
    - `master_supporting_docs/supporting_papers/$ARGUMENTS`
    - Glob for partial matches
 
-2. **Read the full paper** end-to-end. For long PDFs, read in chunks (5 pages at a time).
+2. **Read the full document** end-to-end. For long PDFs, read in chunks (5 pages at a time).
 
 3. **Evaluate across 6 dimensions** (see below).
 
-4. **Generate 3-5 "referee objections"** — the tough questions a top referee would ask.
+4. **Generate 3-5 "reviewer objections"** — the tough questions a blind reviewer would ask.
 
 5. **Produce the review report.**
 
-6. **Save to** `quality_reports/paper_review_[sanitized_name].md`
+6. **Save to** `quality_reports/thesis_evaluation/review_[sanitized_name].md`
 
 ---
 
@@ -38,49 +39,56 @@ Produce a thorough, constructive review of an academic manuscript — the kind o
 ### 1. Argument Structure
 - Is the research question clearly stated?
 - Does the introduction motivate the question effectively?
-- Is the logical flow sound (question → method → results → conclusion)?
+- Is the logical flow sound (question -> method -> results -> conclusion)?
 - Are the conclusions supported by the evidence?
 - Are limitations acknowledged?
+- Are contributions clearly listed and actually delivered?
 
-### 2. Identification Strategy
-- Is the causal claim credible?
-- What are the key identifying assumptions? Are they stated explicitly?
-- Are there threats to identification (omitted variables, reverse causality, measurement error)?
-- Are robustness checks adequate?
-- Is the estimator appropriate for the research design?
+### 2. Technical Approach & Novelty
+- Is the proposed method/algorithm/model technically sound?
+- Are proofs correct and complete?
+- Is the novelty clear relative to prior work?
+- Are assumptions stated explicitly?
+- Is the approach well-justified (why this method over alternatives)?
+- For ML: is the architecture/pipeline design well-motivated?
 
-### 3. Econometric Specification
-- Correct standard errors (clustered? robust? bootstrap?)?
-- Appropriate functional form?
-- Sample selection issues?
-- Multiple testing concerns?
-- Are point estimates economically meaningful (not just statistically significant)?
+### 3. Experimental Design & Evaluation
+- Are baselines fair, appropriate, and up-to-date?
+- Are evaluation metrics appropriate for the task?
+- Is statistical significance reported (or confidence intervals)?
+- Are ablation studies present?
+- Are experiments reproducible (hyperparameters, seeds, code)?
+- Are failure cases discussed?
+- Are comparisons apples-to-apples?
 
 ### 4. Literature Positioning
 - Are the key papers cited?
 - Is prior work characterized accurately?
 - Is the contribution clearly differentiated from existing work?
-- Any missing citations that a referee would flag?
+- Any missing citations that a reviewer would flag?
+- Is the related work well-organized (not just a list)?
 
 ### 5. Writing Quality
 - Clarity and concision
-- Academic tone
+- Academic tone and register
 - Consistent notation throughout
-- Abstract effectively summarizes the paper
+- Abstract effectively summarizes the thesis
 - Tables and figures are self-contained (clear labels, notes, sources)
 
-### 6. Presentation
-- Are tables and figures well-designed?
+### 6. Presentation & Blind-Review Readiness
+- Are tables and figures well-designed and informative?
 - Is notation consistent throughout?
-- Are there any typos, grammatical errors, or formatting issues?
-- Is the paper the right length for the contribution?
+- Are there typos, grammatical errors, or formatting issues?
+- Is the thesis the right length for the contribution?
+- No self-identifying information for blind review?
+- Ethical considerations discussed (if applicable)?
 
 ---
 
 ## Output Format
 
 ```markdown
-# Manuscript Review: [Paper Title]
+# Thesis Review: [Title]
 
 **Date:** [YYYY-MM-DD]
 **Reviewer:** review-paper skill
@@ -88,7 +96,7 @@ Produce a thorough, constructive review of an academic manuscript — the kind o
 
 ## Summary Assessment
 
-**Overall recommendation:** [Strong Accept / Accept / Revise & Resubmit / Reject]
+**Overall recommendation:** [Strong Accept / Accept / Minor Revisions / Major Revisions / Reject]
 
 [2-3 paragraph summary: main contribution, strengths, and key concerns]
 
@@ -101,46 +109,55 @@ Produce a thorough, constructive review of an academic manuscript — the kind o
 ## Major Concerns
 
 ### MC1: [Title]
-- **Dimension:** [Identification / Econometrics / Argument / Literature / Writing / Presentation]
+- **Dimension:** [Technical / Experimental / Argument / Literature / Writing / Presentation]
+- **Location:** [Chapter, Section, Page]
 - **Issue:** [Specific description]
 - **Suggestion:** [How to address it]
-- **Location:** [Section/page/table if applicable]
 
 [Repeat for each major concern]
 
 ## Minor Concerns
 
 ### mc1: [Title]
+- **Location:** [Chapter, Section, Page]
 - **Issue:** [Description]
 - **Suggestion:** [Fix]
 
 [Repeat]
 
-## Referee Objections
+## Reviewer Objections
 
-These are the tough questions a top referee would likely raise:
+These are the tough questions a blind reviewer would likely raise:
 
 ### RO1: [Question]
-**Why it matters:** [Why this could be fatal]
+**Why it matters:** [Why this could be a reason for rejection]
 **How to address it:** [Suggested response or additional analysis]
 
 [Repeat for 3-5 objections]
 
 ## Specific Comments
 
-[Line-by-line or section-by-section comments, if any]
+[Chapter-by-chapter or section-by-section comments]
 
 ## Summary Statistics
 
 | Dimension | Rating (1-5) |
 |-----------|-------------|
 | Argument Structure | [N] |
-| Identification | [N] |
-| Econometrics | [N] |
+| Technical Approach | [N] |
+| Experimental Design | [N] |
 | Literature | [N] |
 | Writing | [N] |
 | Presentation | [N] |
 | **Overall** | **[N]** |
+
+## Blind-Review Readiness
+
+- [ ] No self-identifying information
+- [ ] Professional tone throughout
+- [ ] All claims supported by evidence
+- [ ] Limitations honestly discussed
+- [ ] Ethical considerations addressed (if applicable)
 ```
 
 ---
@@ -148,8 +165,9 @@ These are the tough questions a top referee would likely raise:
 ## Principles
 
 - **Be constructive.** Every criticism should come with a suggestion.
-- **Be specific.** Reference exact sections, equations, tables.
-- **Think like a referee at a top-5 journal.** What would make them reject?
+- **Be specific.** Reference exact chapters, sections, equations, tables.
+- **Think like a top-venue PC member.** What would make them reject?
+- **Calibrate for a master's thesis.** Expectations differ from a journal paper — depth over breadth is acceptable.
 - **Distinguish fatal flaws from minor issues.** Not everything is equally important.
 - **Acknowledge what's done well.** Good research deserves recognition.
 - **Do NOT fabricate details.** If you can't read a section clearly, say so.

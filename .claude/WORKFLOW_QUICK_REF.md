@@ -1,6 +1,7 @@
 # Workflow Quick Reference
 
 **Model:** Contractor (you direct, Claude orchestrates)
+**Project:** Master's Thesis Evaluation — CS/AI
 
 ---
 
@@ -9,11 +10,11 @@
 ```
 Your instruction
     ↓
-[PLAN] (if multi-file or unclear) → Show plan → Your approval
+[PLAN] (if multi-chapter or unclear) → Show plan → Your approval
     ↓
-[EXECUTE] Implement, verify, done
+[EXECUTE] Read thesis, evaluate, produce report
     ↓
-[REPORT] Summary + what's ready
+[REPORT] Summary + findings + next steps
     ↓
 Repeat
 ```
@@ -22,20 +23,22 @@ Repeat
 
 ## I Ask You When
 
-- **Design forks:** "Option A (fast) vs. Option B (robust). Which?"
-- **Code ambiguity:** "Spec unclear on X. Assume Y?"
-- **Replication edge case:** "Just missed tolerance. Investigate?"
-- **Scope question:** "Also refactor Y while here, or focus on X?"
+- **Evaluation scope:** "Full thesis or specific chapter?"
+- **Ambiguous content:** "The student claims X but it's unclear if Y. Flag it or investigate?"
+- **Severity judgment:** "This could be CRITICAL or MAJOR — how strict for blind review?"
+- **Scope question:** "Also check the bibliography in depth, or focus on methodology?"
+- **Student communication:** "Should this feedback be direct or softened?"
 
 ---
 
 ## I Just Execute When
 
-- Code fix is obvious (bug, pattern application)
-- Verification (tolerance checks, tests, compilation)
-- Documentation (logs, commits)
-- Plotting (per established standards)
-- Deployment (after you approve, I ship automatically)
+- Reading and analyzing thesis content
+- Producing evaluation reports
+- Proofreading (grammar, typos, notation)
+- Citation cross-referencing
+- Literature gap analysis
+- Session logging and documentation
 
 ---
 
@@ -43,44 +46,41 @@ Repeat
 
 | Score | Action |
 |-------|--------|
-| >= 80 | Ready to commit |
-| < 80  | Fix blocking issues |
+| >= 80 | Evaluation report ready to commit |
+| < 80  | Fix gaps in evaluation report |
 
 ---
 
-## Non-Negotiables (Customize These)
+## Non-Negotiables
 
-<!-- Replace with YOUR project's locked-in preferences -->
-
-- [YOUR PATH CONVENTION] (e.g., `here::here()` for R, relative paths for LaTeX)
-- [YOUR SEED CONVENTION] (e.g., `set.seed()` once at top for stochastic code)
-- [YOUR FIGURE STANDARDS] (e.g., white bg, 300 DPI, custom theme)
-- [YOUR COLOR PALETTE] (e.g., institutional colors)
-- [YOUR TOLERANCE THRESHOLDS] (e.g., 1e-6 for point estimates)
+- **Read-only thesis source** — never edit `Thesis/*.tex` without explicit permission
+- **Specific locations** — every issue cites chapter, section, page, or equation number
+- **Constructive tone** — every criticism includes a concrete, actionable suggestion
+- **No fabrication** — never claim the thesis says something without reading it
+- **Acknowledge strengths** — every review includes positive findings
+- **Blind-review calibration** — feedback targets what a reviewer at a top CS/AI venue would flag
 
 ---
 
 ## Preferences
 
-<!-- Fill in as you discover your working style -->
-
-**Visual:** [How you want figures/plots handled]
-**Reporting:** [Concise bullets? Detailed prose? Details on request?]
+**Reporting:** Structured markdown reports with severity levels; concise summaries at top
 **Session logs:** Always (post-plan, incremental, end-of-session)
-**Replication:** [How strict? Flag near-misses?]
+**Evaluation depth:** Thorough — better to be too detailed than too shallow
+**Tone:** Professional, constructive, calibrated for a master's thesis (not a journal paper)
 
 ---
 
 ## Exploration Mode
 
-For experimental work, use the **Fast-Track** workflow:
+For experimental analysis (e.g., reproducing thesis results, testing claims):
 - Work in `explorations/` folder
 - 60/100 quality threshold (vs. 80/100 for production)
-- No plan needed — just a research value check (2 min)
+- No plan needed — just a research value check
 - See `.claude/rules/exploration-fast-track.md`
 
 ---
 
 ## Next Step
 
-You provide task → I plan (if needed) → Your approval → Execute → Done.
+You provide task → I plan (if needed) → Your approval → Read thesis → Evaluate → Report → Done.

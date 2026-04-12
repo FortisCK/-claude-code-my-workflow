@@ -24,6 +24,12 @@ PROTECTED_PATTERNS=(
   "settings.json"
 )
 
+# Protect all thesis source files (read-only by default)
+if [[ "$FILE" == *"/Thesis/"* ]]; then
+  echo "Protected: Thesis source files are read-only. Ask the advisor for permission to edit, or remove protection in .claude/hooks/protect-files.sh" >&2
+  exit 2
+fi
+
 BASENAME=$(basename "$FILE")
 for PATTERN in "${PROTECTED_PATTERNS[@]}"; do
   if [[ "$BASENAME" == "$PATTERN" ]]; then
