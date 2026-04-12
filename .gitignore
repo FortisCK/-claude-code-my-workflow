@@ -50,6 +50,9 @@ Thumbs.db
 # Quarto rendering artifacts
 /.quarto/
 
+# Student thesis source (private — never push to remote)
+Thesis/
+
 # Output artifacts — uncomment lines below based on your preference
 # *.rds
 # output/**/*.rds
