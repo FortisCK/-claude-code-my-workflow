@@ -18,18 +18,18 @@ Transcatheter aortic valve implantation (TAVI) is a minimally invasive procedure
 | ID | Name | Anatomical Location | Clinical Use |
 |----|------|---------------------|-------------|
 | P0 | NCC Hinge | Nadir of non-coronary cusp | Annular plane (sizing) |
-| P1 | LCC Hinge | Nadir of left coronary cusp | Annular plane (sizing) |
-| P2 | RCC Hinge | Nadir of right coronary cusp | Annular plane (sizing) |
-| P3 | N-L Commissure | NCC/LCC junction | Rotational alignment |
-| P4 | L-R Commissure | LCC/RCC junction | Rotational alignment |
-| P5 | R-N Commissure | RCC/NCC junction | Rotational alignment |
+| P1 | RCC Hinge | Nadir of right coronary cusp | Annular plane (sizing) |
+| P2 | LCC Hinge | Nadir of left coronary cusp | Annular plane (sizing) |
+| P3 | N-R Commissure | NCC/RCC junction | Cusp-wedge sector boundary |
+| P4 | R-L Commissure | RCC/LCC junction | Cusp-wedge sector boundary |
+| P5 | L-N Commissure | LCC/NCC junction | Cusp-wedge sector boundary |
 | P6 | Center | Geometric center of valve coaptation | Valve area, catheter path |
 | P7 | MS Point | Lower part of membranous septum (RCC/NCC junction, deep) | MSL measurement, pacemaker risk (NOCD) |
 | P8 | LCO | Left coronary ostium (LCC sinus wall) | Coronary height, obstruction risk |
 | P9 | RCO | Right coronary ostium (RCC sinus wall) | Coronary height, obstruction risk |
 
 **Key clinical derived parameters:**
-- **Coronary Height:** H = Dist(P8 or P9, Annular Plane fitted by P0-P2). Threshold: <10mm high risk, <12mm caution.
+- **Coronary Height:** H = Dist(P8 or P9, Annular Plane fitted by P0-P2). Threshold: <12mm flagged risk per SCCT 2019 consensus (Blanke et al.); some older literature uses <10mm.
 - **MSL (Membranous Septum Length):** Dist(P7, Annular Plane). Predicts pacemaker implantation risk.
 - **P7 is the hardest landmark** to detect (3.38mm in Ma et al., 3.46mm in current model) due to severe calcification and low CT contrast at the membranous septum.
 

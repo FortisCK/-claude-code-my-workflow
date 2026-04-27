@@ -134,3 +134,7 @@ Check git log and quality_reports/plans/ for current state.
 ### Verification
 - 3-pass pdflatex + bibtex: 18 pages, 5.23 MB, 0 undefined citations, 0 undefined refs, 2 sub-1pt overfull (pre-existing).
 
+
+---
+**Context compaction (auto) at 21:49**
+Check git log and quality_reports/plans/ for current state.
