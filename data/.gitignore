@@ -1,0 +1,4 @@
+# Ignore all data files; track only this directory's metadata.
+*
+!.gitignore
+!README.md

@@ -1,33 +1,157 @@
-% ==============================================================================
-% Bibliography Template
-% ==============================================================================
+% =============================================================================
+% Bibliography — Cardiac CT Motion-Artifact Correction
+% =============================================================================
 %
-% Add your bibliography entries here.
-% This file is referenced by both Beamer (.tex) and Quarto (.qmd) slides.
+% Shared across all manuscript subprojects (manuscript/miccai2027/,
+% manuscript/cvpr2027/, manuscript/tmi-extension/).
 %
-% Naming convention: AuthorYear_keyword
-% Example: Smith2024_causal_inference
+% Cite-key convention: Author<Year>_keyword (e.g., Deng2023_TTUNet).
 %
-% ==============================================================================
+% Verification status (run via the claim-verifier agent on 2026-04-29):
+%   - 1 entry  VERIFIED (Chung2023_DPS)
+%   - 8 entries PARTIAL (corrections applied below; some fields still need
+%                        manual confirmation — see "% NEEDS-MANUAL-CHECK"
+%                        markers).
+%
+% Before any of these entries enters a SUBMITTED manuscript, re-run
+% /verify-claims on this file.
+%
+% =============================================================================
+% PRIMARY METHOD ANCHORS
+% =============================================================================
 
-% ------------------------------------------------------------------------------
-% EXAMPLE ENTRIES — delete these and add your own
-% ------------------------------------------------------------------------------
-
-@book{Example2024_book,
-  author    = {Lastname, Firstname},
-  title     = {An Example Book Title},
-  publisher = {Example University Press},
-  year      = {2024},
-  address   = {City, State}
+% TT U-Net — closest open-source cardiac CT motion-correction baseline. Deng's
+% group also released the PAD motion-simulation pipeline that we plan to adapt
+% to ImageCAS.
+% Verified 2026-04-29: title, venue, DOI, first author (Ziheng Deng).
+% Co-author list is approximate; verify against IEEE Xplore before submission.
+@article{Deng2023_TTUNet,
+  author    = {Deng, Ziheng and Zhang, Yuxuan and Chen, Yulun and Tang, Tao and Qian, Wei and Hu, Zhanli}, % NEEDS-MANUAL-CHECK middle authors
+  title     = {{TT U-Net: Temporal Transformer U-Net for Motion Artifact Reduction Using PAD (Pseudo All-Phase Clinical-Dataset) in Cardiac CT}},
+  journal   = {IEEE Transactions on Medical Imaging},
+  volume    = {42},
+  number    = {12},
+  pages     = {3805--3816},
+  year      = {2023},
+  doi       = {10.1109/TMI.2023.3310933},
+  note      = {SSIM-Local 0.84, Dice-RCA 0.81 reported. Open-source code + PAD pipeline.}
 }
 
-@article{Example2025_article,
-  author  = {Lastname, Firstname and Coauthor, Name},
-  title   = {An Example Journal Article Title},
-  journal = {Journal of Example Studies},
-  volume  = {10},
-  number  = {2},
-  pages   = {100--125},
-  year    = {2025}
+% HM-EDM — first diffusion-based CT motion correction (head, rigid).
+% Workshop version at AMAI@MICCAI 2024; CMIG journal extension (online Dec 2024,
+% issue 2025). Brain SSIM 0.17 → 0.51 on n=100, 5-case reader study.
+% Verified 2026-04-29: title, venue, DOI, first author (Zhennong Chen).
+@inproceedings{Chen2024_HMEDM_workshop,
+  author    = {Chen, Zhennong and Wu, Dufan and others}, % NEEDS-MANUAL-CHECK full LNCS author ordering
+  title     = {{Head CT Scan Motion Artifact Correction via Diffusion-Based Generative Models}},
+  booktitle = {Applications of Medical Artificial Intelligence (AMAI) Workshop @ MICCAI 2024},
+  series    = {Lecture Notes in Computer Science},
+  publisher = {Springer},
+  year      = {2024},
+  doi       = {10.1007/978-3-031-82007-6_3},
+  note      = {Workshop version. EDM (Elucidated Diffusion Models) framework. 128 \times 128 \times 50 patches; channel-concat conditioning; A100 32 GB.}
+}
+
+% Verified 2026-04-29: full author list, exact title, journal vol/page, DOI/PMID.
+@article{Chen2024_HMEDM_CMIG,
+  author    = {Chen, Zhennong and Yoon, Siyeop and Strotzer, Quirin and Khalid, Rehab Naeem and Tivnan, Matthew and Li, Quanzheng and Gupta, Rajiv and Wu, Dufan},
+  title     = {{Portable Head CT Motion Artifact Correction via Diffusion-Based Generative Model}},
+  journal   = {Computerized Medical Imaging and Graphics},
+  volume    = {119},
+  pages     = {102478},
+  year      = {2025},
+  note      = {Online publication December 2024. Journal extension of Chen2024\_HMEDM\_workshop. Brain SSIM 0.17 -> 0.51 on n=100. PMID 39705889. EDM framework, NOT energy-based models.}
+}
+
+% ProDM — non-contrast COCA Agatston scoring with bridge-style progressive
+% diffusion. Stanford COCA n=435; motion engine moves calcium points only;
+% 30-case reader study. Their task-driven differentiable Agatston-surrogate
+% loss is the inspiration for our lumen-geometry-aware loss.
+% Verified 2026-04-29: arXiv ID, full author list, exact title, first author
+% (Xinran Gong, Northwestern; senior author Bo Zhou).
+@article{Gong2025_ProDM,
+  author    = {Gong, Xinran and Durak, Gorkem and Aktas, Halil Ertugrul and Cicek, Vedat and Hao, Jinkui and Bagci, Ulas and Shah, Nilay S. and Zhou, Bo},
+  title     = {{ProDM: Synthetic Reality-driven Property-aware Progressive Diffusion Model for Coronary Calcium Motion Correction in Non-gated Chest CT}},
+  journal   = {arXiv preprint arXiv:2512.24948},
+  year      = {2025},
+  eprint    = {2512.24948},
+  archivePrefix = {arXiv},
+  note      = {Non-contrast COCA scope. Task-driven Agatston-surrogate loss (lambda=20, sigmoid HU >= 130 mask).}
+}
+
+% C2F-MC — coarse-to-fine diffusion-based motion correction for cardiac MRI
+% reconstruction. Cited in our manuscript intro to elegantly scope-cut
+% Path B (k-space-domain methods have no equivalent handle in the CT
+% image-domain dataset class we work with).
+% Verified 2026-04-29: arXiv ID, exact title, first author (Frederic Wang).
+% Note: title does NOT contain "C2F-MC" or "DPS" -- those are method shorthands
+% from the abstract / community usage, not the paper title.
+@article{Wang2025_C2FMC,
+  author    = {Wang, Frederic and Tamir, Jonathan I.},
+  title     = {{Non-rigid Motion Correction for MRI Reconstruction via Coarse-To-Fine Diffusion Models}},
+  journal   = {arXiv preprint arXiv:2505.15057},
+  year      = {2025},
+  eprint    = {2505.15057},
+  archivePrefix = {arXiv},
+  note      = {Linear k-space forward operator y = M F S Phi x. Alternating-minimization framework (not strictly DPS). 8 \times V100, ~48 h training.}
+}
+
+% DPS — Diffusion Posterior Sampling. Theoretical foundation for our UQ
+% claim and (optionally) DPS-style guidance at inference.
+% VERIFIED 2026-04-29: authors, title, venue, arXiv ID all confirmed.
+@inproceedings{Chung2023_DPS,
+  author    = {Chung, Hyungjin and Kim, Jeongsol and Mccann, Michael T. and Klasky, Marc L. and Ye, Jong Chul},
+  title     = {{Diffusion Posterior Sampling for General Noisy Inverse Problems}},
+  booktitle = {International Conference on Learning Representations (ICLR)},
+  year      = {2023},
+  eprint    = {2209.14687},
+  archivePrefix = {arXiv}
+}
+
+% =============================================================================
+% SECONDARY BASELINES (SOTA comparison table)
+% =============================================================================
+
+% ATOM — U-Net + attention gate + STN, Mayo private 71-case DSCT, closed-source.
+% Verified 2026-04-29: exact title, journal, DOI, n=71. First-author surname
+% needs manual verification (the seed cite-key Gong2024_ATOM may not match the
+% actual lead author).
+@article{Lu2024_ATOM,
+  author    = {Lu, Y. and others}, % NEEDS-MANUAL-CHECK first-author surname
+  title     = {{Motion Artifact Correction in Cardiac CT Using Cross-Phase Temporospatial Information and Synergistic Attention Gate and Spatial Transformer Sub-Networks}},
+  journal   = {Physics in Medicine \& Biology},
+  year      = {2024},
+  doi       = {10.1088/1361-6560/ad1b6a},
+  note      = {Mayo private DSCT data, n=71. Closed-source. Method nicknamed ATOM.}
+}
+
+% TW-MoCoNet — temporal-weighted CNN + STN, n=67 clinical.
+% Verified 2026-04-29: exact title, journal, DOI, n=67. First-author surname
+% needs manual verification (the seed assumed Yao based on simple_plan.html).
+@article{Yao2025_TWMoCoNet,
+  author    = {Yao, Y. and others}, % NEEDS-MANUAL-CHECK first-author full name
+  title     = {{Deep Learning-Based Cardiac CT Coronary Motion Correction Method with Temporal Weight Adjustment: Clinical Data Evaluation}},
+  journal   = {Journal of Imaging Informatics in Medicine},
+  year      = {2025},
+  doi       = {10.1007/s10278-025-01683-4},
+  note      = {n=67 clinical cases. Closed-source. Method nicknamed TW-MoCoNet inside the abstract.}
+}
+
+% =============================================================================
+% CLINICAL FRAMING ANCHOR (TAVI motivation)
+% =============================================================================
+
+% Shows motion artifacts directly degrade pre-TAVI aortic-annulus measurement
+% accuracy, stratified by heart rate. Cited in our intro to anchor clinical
+% relevance to the TAVI workflow (rather than to generic image quality).
+% Verified 2026-04-29: exact title, journal, DOI, first author (Matsumoto).
+% Full author list still needs manual fetch from the Nature page.
+@article{Matsumoto2023_SSF2_TAVI,
+  author    = {Matsumoto, Hidenari and others}, % NEEDS-MANUAL-CHECK full author list
+  title     = {{Evaluation of the Second-Generation Whole-Heart Motion Correction Algorithm (SSF2) Used to Demonstrate the Aortic Annulus on Cardiac CT}},
+  journal   = {Scientific Reports},
+  publisher = {Nature Publishing Group},
+  year      = {2023},
+  doi       = {10.1038/s41598-023-30786-7},
+  note      = {SSF2 algorithm. HR-stratified quantitative analysis. Cited as clinical motivation in our intro.}
 }
