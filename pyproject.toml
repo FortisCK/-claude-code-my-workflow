@@ -1,0 +1,84 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cardiac-artifacts"
+version = "0.1.0"
+description = "3D conditional latent-diffusion cardiac CT motion-artifact correction"
+authors = [{ name = "CMZ", email = "mingzhang.chen@etudiant.univ-rennes.fr" }]
+readme = "README.md"
+requires-python = ">=3.10,<3.12"
+license = { text = "MIT" }
+
+# Version pins are intentionally loose during Week 1-2 (project just bootstrapping).
+# Tighten before any first arXiv preprint.
+dependencies = [
+    # --- Deep learning core ---
+    "torch>=2.3",
+    "torchvision>=0.18",
+
+    # --- Medical-imaging deep learning ---
+    "monai>=1.4",
+    "monai-generative",      # young; no upper bound
+
+    # --- Medical imaging IO ---
+    "nibabel>=5.0",
+    "pydicom>=2.4",
+    "SimpleITK>=2.4",
+
+    # --- Numerics + image ---
+    # Numpy 2.x not yet compatible with all of MONAI / scientific stack as of writing.
+    "numpy>=1.26,<2.0",
+    "scipy>=1.13",
+    "scikit-image>=0.24",
+    "scikit-learn>=1.4",     # PCA / SVD for shape-model L3 fallback
+
+    # --- Experiment tracking + config ---
+    "wandb>=0.18",
+    "omegaconf>=2.3",
+    "pyyaml>=6.0",
+
+    # --- Misc utilities ---
+    "tqdm>=4.66",
+    "matplotlib>=3.8",
+    "einops>=0.8",
+    "kaggle>=1.6",           # ImageCAS download
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6",
+    "black>=24.8",
+    "mypy>=1.11",
+    "pytest>=8.3",
+]
+
+# L2 fallback for PAD pipeline (only install if Day 5 decides L2 path)
+octave-fallback = [
+    "oct2py>=5.7",
+]
+
+# Path-B exploration (Week 17+, NOT installed Week 1-2)
+# pathB = ["leap-imaging-toolkit"]
+
+[tool.setuptools]
+packages = ["code", "code.data", "code.models", "code.training", "code.evaluation", "code.inference"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+extend-exclude = [".claude/archive/", "explorations/ARCHIVE/"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "RUF"]
+ignore = ["E501"]  # line length handled by black, ruff just warns
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_unused_ignores = true
+ignore_missing_imports = true   # loose mode for week 1-2; tighten later
