@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>博士代表作战略简报 — 基于条件 Latent Diffusion 的心脏 CT 运动伪影校正</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;500;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #0d1117;
+    --paper: #f5f1e8;
+    --paper-2: #ebe5d4;
+    --rule: #1a1f2b;
+    --accent: #b4472a;     /* terracotta */
+    --accent-2: #1f3a5f;   /* deep navy */
+    --ok: #2d5a3f;
+    --warn: #8b6914;
+    --risk: #7a2020;
+    --muted: #4a4538;
+    --grid: rgba(13, 17, 23, 0.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'Noto Serif SC', 'Songti SC', 'SimSun', Georgia, serif;
+    font-feature-settings: "kern";
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.75;
+    font-size: 16px;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  .page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 80px 60px 120px;
+    background: var(--paper);
+    position: relative;
+  }
+
+  .page::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; left: 0;
+    width: 4px;
+    background: var(--ink);
+  }
+
+  /* ====== HEADER ====== */
+  header.masthead {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 32px;
+    margin-bottom: 48px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 40px;
+    align-items: end;
+  }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+    display: inline-block;
+  }
+
+  h1.title {
+    font-size: 44px;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    margin-bottom: 16px;
+  }
+
+  h1.title em {
+    font-style: normal;
+    font-weight: 700;
+    color: var(--accent-2);
+  }
+
+  .subtitle {
+    font-size: 17px;
+    color: var(--muted);
+    font-weight: 400;
+    max-width: 620px;
+    line-height: 1.6;
+  }
+
+  .metabox {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    text-align: right;
+    color: var(--muted);
+    line-height: 1.8;
+    border-left: 1px solid var(--ink);
+    padding-left: 20px;
+  }
+
+  .metabox strong {
+    color: var(--ink);
+    font-weight: 700;
+    font-family: 'Noto Serif SC', serif;
+    font-size: 13px;
+  }
+
+  /* ====== TOC ====== */
+  nav.toc {
+    margin: 48px 0 64px;
+    padding: 24px 28px;
+    background: var(--paper-2);
+    border: 1px solid var(--ink);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px 32px;
+  }
+
+  nav.toc h2 {
+    grid-column: 1 / -1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 12px;
+    font-weight: 500;
+  }
+
+  nav.toc ol {
+    list-style: none;
+    counter-reset: toc;
+  }
+
+  nav.toc li {
+    counter-increment: toc;
+    font-size: 14px;
+    padding: 8px 0;
+    border-bottom: 1px dotted rgba(13, 17, 23, 0.2);
+  }
+
+  nav.toc li::before {
+    content: counter(toc, decimal-leading-zero);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    margin-right: 10px;
+  }
+
+  nav.toc a {
+    color: var(--ink);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+
+  nav.toc a:hover {
+    color: var(--accent);
+  }
+
+  /* ====== SECTION ====== */
+  section {
+    margin-bottom: 72px;
+    scroll-margin-top: 40px;
+  }
+
+  section > h2.section-title {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.2;
+    margin-bottom: 28px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--ink);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  .sec-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    font-weight: 500;
+    padding-top: 6px;
+  }
+
+  h3.sub {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--accent-2);
+    margin: 28px 0 12px;
+    padding-left: 12px;
+    border-left: 3px solid var(--accent);
+  }
+
+  p { margin-bottom: 16px; max-width: 72ch; }
+
+  strong {
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  em {
+    color: var(--accent-2);
+    font-style: normal;
+    font-weight: 600;
+  }
+
+  code, .mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.88em;
+    background: var(--paper-2);
+    padding: 1px 6px;
+    border-radius: 2px;
+  }
+
+  /* 中文里嵌英文术语的细节调整 */
+  .en {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9em;
+    font-weight: 500;
+  }
+
+  /* ====== KEY CALLOUTS ====== */
+  .pullquote {
+    font-size: 22px;
+    line-height: 1.5;
+    color: var(--ink);
+    font-weight: 500;
+    border-left: 4px solid var(--accent);
+    padding: 16px 0 16px 28px;
+    margin: 32px 0;
+    max-width: 85%;
+  }
+
+  .pullquote .attr {
+    display: block;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-weight: 400;
+    margin-top: 12px;
+  }
+
+  .callout {
+    border: 1px solid var(--ink);
+    padding: 20px 26px;
+    margin: 24px 0;
+    background: var(--paper-2);
+    position: relative;
+  }
+
+  .callout.finding { border-left: 4px solid var(--ok); }
+  .callout.risk { border-left: 4px solid var(--risk); }
+  .callout.insight { border-left: 4px solid var(--accent); }
+
+  .callout-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 10px;
+    display: block;
+    font-weight: 600;
+  }
+
+  .callout.finding .callout-label { color: var(--ok); }
+  .callout.risk .callout-label { color: var(--risk); }
+  .callout.insight .callout-label { color: var(--accent); }
+
+  .callout p:last-child { margin-bottom: 0; }
+
+  /* ====== COMPARISON TABLE ====== */
+  .table-wrap {
+    margin: 32px 0;
+    overflow-x: auto;
+    border: 1px solid var(--ink);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--paper);
+  }
+
+  table th {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: 'Noto Sans SC', sans-serif;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding: 12px 14px;
+    text-align: left;
+    vertical-align: bottom;
+  }
+
+  table td {
+    padding: 14px;
+    border-bottom: 1px solid rgba(13,17,23,0.15);
+    vertical-align: top;
+    font-family: 'Noto Sans SC', sans-serif;
+    line-height: 1.6;
+  }
+
+  table tr:last-child td { border-bottom: none; }
+  table tr:nth-child(even) td { background: rgba(235, 229, 212, 0.4); }
+
+  table td.method-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--accent-2);
+  }
+
+  table td.method-name small {
+    display: block;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-weight: 400;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .pill {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+    border-radius: 2px;
+    border: 1px solid currentColor;
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+
+  .pill.yes { color: var(--ok); }
+  .pill.no { color: var(--risk); }
+  .pill.partial { color: var(--warn); }
+
+  /* ====== THREE-UP GRID ====== */
+  .three-up {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin: 28px 0;
+  }
+
+  .gap-card {
+    border: 1px solid var(--ink);
+    padding: 24px;
+    background: var(--paper);
+    position: relative;
+  }
+
+  .gap-card .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 48px;
+    font-weight: 300;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+  }
+
+  .gap-card h4 {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    line-height: 1.3;
+  }
+
+  .gap-card p {
+    font-size: 13px;
+    font-family: 'Noto Sans SC', sans-serif;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 0;
+  }
+
+  /* ====== TIMELINE ====== */
+  .timeline {
+    margin: 32px 0;
+    border-left: 2px solid var(--ink);
+    padding-left: 32px;
+    position: relative;
+  }
+
+  .tl-item {
+    margin-bottom: 28px;
+    position: relative;
+  }
+
+  .tl-item::before {
+    content: '';
+    position: absolute;
+    left: -39px;
+    top: 6px;
+    width: 12px;
+    height: 12px;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    border-radius: 50%;
+  }
+
+  .tl-item.now::before { background: var(--accent); border-color: var(--accent); }
+
+  .tl-month {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .tl-title {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+
+  .tl-body {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  /* ====== LIST STYLING ====== */
+  ul.stylized, ol.stylized {
+    margin: 14px 0 18px 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  ul.stylized li, ol.stylized li {
+    position: relative;
+    padding-left: 28px;
+    margin-bottom: 12px;
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  ul.stylized li::before {
+    content: '§';
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  ol.stylized {
+    counter-reset: stylized;
+  }
+
+  ol.stylized li {
+    counter-increment: stylized;
+  }
+
+  ol.stylized li::before {
+    content: counter(stylized, decimal-leading-zero);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    font-weight: 700;
+    top: 5px;
+  }
+
+  /* ====== RISK MATRIX ====== */
+  .risks {
+    display: grid;
+    gap: 14px;
+    margin: 24px 0;
+  }
+
+  .risk-row {
+    display: grid;
+    grid-template-columns: 200px 1fr 1fr;
+    gap: 24px;
+    padding: 18px 22px;
+    border: 1px solid var(--ink);
+    font-size: 14px;
+    line-height: 1.7;
+    align-items: start;
+  }
+
+  .risk-row .rname {
+    font-weight: 700;
+    color: var(--accent-2);
+    font-size: 15px;
+  }
+
+  .risk-row .rlabel {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  /* ====== FOOTER ====== */
+  footer {
+    margin-top: 100px;
+    padding-top: 32px;
+    border-top: 2px solid var(--ink);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    align-items: end;
+  }
+
+  footer .sig {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 14px;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ====== PRINT ====== */
+  @media print {
+    body { background: white; }
+    .page { padding: 40px; }
+    section { break-inside: avoid; }
+    .callout, .gap-card, .tl-item { break-inside: avoid; }
+  }
+
+  @media (max-width: 820px) {
+    .page { padding: 40px 24px; }
+    header.masthead { grid-template-columns: 1fr; }
+    .metabox { text-align: left; border-left: none; border-top: 1px solid var(--ink); padding: 16px 0 0; }
+    h1.title { font-size: 28px; }
+    nav.toc { grid-template-columns: 1fr; }
+    .three-up { grid-template-columns: 1fr; }
+    .risk-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ============ MASTHEAD ============ -->
+<header class="masthead">
+  <div>
+    <div class="eyebrow">博士代表作战略简报 · 内部讨论稿 · V2(三篇核心论文全文精读后修订)</div>
+    <h1 class="title">
+      面向代表作的下一步:<br>
+      基于<em>条件 Latent Diffusion</em> 的<br>
+      <em>心脏 CT 运动伪影校正</em>
+    </h1>
+    <p class="subtitle">
+      一份关于将下一篇论文定位在 3D diffusion、后验不确定性、下游任务感知评估
+      这三者交叉点的战略论证 —— 以 TAVI 作为临床锚点。
+    </p>
+  </div>
+  <div class="metabox">
+    受众<br><strong>CMZ</strong><br>
+    LTSI / Rennes<br>
+    <br>
+    日期<br><strong>2026 年 4 月(V2)</strong><br>
+    <br>
+    目标 venue<br><strong>CVPR / MICCAI / TMI</strong>
+  </div>
+</header>
+
+<!-- ============ CHANGELOG (V2) ============ -->
+<div style="margin: 32px 0 48px; padding: 24px 28px; border: 1px solid #6b4f8a; background: rgba(107, 79, 138, 0.04); border-left: 4px solid #6b4f8a;">
+  <h2 style="font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.15em; color: #6b4f8a; margin-bottom: 14px; font-weight: 600;">V2 修订说明 · 基于全文精读后的更新</h2>
+  <p style="font-family: 'Noto Sans SC', sans-serif; font-size: 14px; line-height: 1.7; margin-bottom: 14px;">
+    V1 是基于 abstract 和搜索片段做的判断。V2 在精读了三篇核心论文(<em>TT U-Net</em> 全文、<em>HM-EDM</em> 全文、<em>ProDM</em> 全文)以及 <em>C2F-MC</em>(MRI 端 Path B 参考)之后,做了以下关键修订:
+  </p>
+  <ul style="list-style: none; padding: 0; font-family: 'Noto Sans SC', sans-serif; font-size: 14px; line-height: 1.7;">
+    <li style="padding: 6px 0 6px 22px; position: relative;"><span style="position: absolute; left: 0; color: #6b4f8a; font-weight: 700;">→</span><strong>HM-EDM 降级</strong>:从"强先驱者 / 主要威胁"修正为"workshop-quality proof-of-concept,可借鉴的 baseline template"。它的 quantitative 结果远比之前估计的弱(brain SSIM 仅 0.17→0.51),数据规模小(100 例),reader study 极其 preliminary(5 例)。</li>
+    <li style="padding: 6px 0 6px 22px; position: relative;"><span style="position: absolute; left: 0; color: #6b4f8a; font-weight: 700;">→</span><strong>ProDM scope 切割更精确</strong>:他们做的是 non-contrast COCA 钙化评分,使用的 motion engine 只动钙化点不动整个心脏。和你的 contrast CCTA + lumen/stenosis scope 完全不重叠,且他们的方法不可直接迁移。</li>
+    <li style="padding: 6px 0 6px 22px; position: relative;"><span style="position: absolute; left: 0; color: #6b4f8a; font-weight: 700;">→</span><strong>C2F-MC 加入</strong>:作为 Path B 在 cardiac 的 MRI 参考,用于在论文里 elegant cite 并 scope cut(他们利用 k-space 物理一致性,CT 没有等价手柄)。</li>
+    <li style="padding: 6px 0 6px 22px; position: relative;"><span style="position: absolute; left: 0; color: #6b4f8a; font-weight: 700;">→</span><strong>TT U-Net 真实数字补充</strong>:SSIM-Local 84%、Dice-RCA 81%、w/o TTL 退化到 73-81% — 这给了你具体的对比基线。</li>
+    <li style="padding: 6px 0 6px 22px; position: relative;"><span style="position: absolute; left: 0; color: #6b4f8a; font-weight: 700;">→</span><strong>方法学借鉴更新</strong>:ProDM 的 task-driven differentiable loss 哲学(可借鉴为 lumen-aware loss);HM-EDM 的 patch-wise 3D EDM template(可直接 reproduce)。</li>
+    <li style="padding: 6px 0 6px 22px; position: relative;"><span style="position: absolute; left: 0; color: #6b4f8a; font-weight: 700;">→</span><strong>风险矩阵调整</strong>:scooping risk 略有降低(HM-EDM 比想象中弱,ProDM 在不同 scope);sim-to-real gap 上调为领域共同限制(ProDM 自己也只到 Likert 3 分)。</li>
+    <li style="padding: 6px 0 6px 22px; position: relative;"><span style="position: absolute; left: 0; color: #6b4f8a; font-weight: 700;">→</span><strong>速度紧迫性强化</strong>:窗口期估计从 6 个月缩短到 4-5 个月(MGH/Northwestern 两组都可能在做 cardiac 扩展)。</li>
+  </ul>
+</div>
+
+<!-- ============ TOC ============ -->
+<nav class="toc">
+  <h2>目录</h2>
+  <ol>
+    <li><a href="#tldr">核心结论</a></li>
+    <li><a href="#problem">问题的重新定义</a></li>
+    <li><a href="#landscape">SOTA 全景</a></li>
+    <li><a href="#gaps">三个研究空白</a></li>
+    <li><a href="#proposal">方法构想</a></li>
+    <li><a href="#data">数据与可复现性</a></li>
+    <li><a href="#novelty">可辩护的 Novelty</a></li>
+    <li><a href="#risks">风险与退路</a></li>
+    <li><a href="#timeline">投稿时间线</a></li>
+  </ol>
+</nav>
+
+<!-- ============ 1. TLDR ============ -->
+<section id="tldr">
+  <h2 class="section-title"><span class="sec-num">§ 01</span>核心结论</h2>
+
+  <p class="pullquote">
+    一个 3D 条件 latent diffusion 模型,用于 single-phase 心脏 CT 运动伪影校正,
+    原生提供后验采样不确定性,并以 TAVI 相关下游任务作为评估核心 ——
+    这是一个 2023 到 2026 年文献中没人占据、但所有条件都对你有利的空位。
+    <span class="attr">— 一句话版本</span>
+  </p>
+
+  <p>
+    心脏 CT 运动伪影校正这个 niche 当前被 U-Net 加 spatial transformer 的确定性架构所主导,
+    最强的先前工作是 <em>TT U-Net</em>(TMI 2023,代码开源,SSIM-Local 84%、Dice-RCA 81%)。
+    <em>HM-EDM</em>(AMAI@MICCAI 2024 / CMIG 2025)是第一个 diffusion-based CT motion correction,
+    但全文精读后发现它是 workshop-quality 的 proof-of-concept(100 例数据、brain SSIM 仅 0.51、
+    5 例 reader study),**可作为 baseline template 直接借鉴,而非不可逾越的对手**。
+    <em>ProDM</em>(Northwestern,arXiv 2512.24948,Dec 2025)是最近的相关工作,
+    但 scope 完全不重叠 —— 他们做 non-contrast COCA 数据集上的钙化评分,
+    motion engine 只动钙化点不动整个心脏,方法不可直接迁移到 contrast CCTA + lumen/stenosis 场景。
+  </p>
+
+  <p>
+    三个结构性空白同时存在:<strong>(1)</strong> gated CCTA + diffusion + lumen 评估这个组合无人占据;
+    <strong>(2)</strong> 没有任何工作做 uncertainty quantification;
+    <strong>(3)</strong> 没有任何工作做 downstream task-aware 评估(stenosis grading、TAVI landmark 精度)。
+    凭借你的 conditional diffusion 经验背景、A6000 单卡算力(HM-EDM 在 A100 32GB 跑得动,你的 48GB 充裕)、
+    以及现成可用的 ImageCAS + PAD 运动模拟 pipeline,同时命中这三个空白是可行的。
+  </p>
+
+  <p>
+    最重要的是,这个方向和你的 TAVI 主业之间有一个意外的故事闭环:
+    2023 年 Nature <em>Scientific Reports</em> 上的一篇论文明确指出,
+    运动伪影会直接损害 TAVI 术前 aortic annulus 测量的精度 ——
+    这恰好是你 landmark detection 工作的核心目标。两篇论文因此可以形成
+    一个彼此增强的叙事弧线,而不是争夺你的时间。
+  </p>
+
+  <div class="callout finding">
+    <span class="callout-label">判断</span>
+    <p><strong>推进。</strong>预计首次投稿时间线 5 到 7 个月。
+    CVPR 2027 / MICCAI 2026 都可行。TMI 作为期刊扩展版作为投稿周期滑点时的 fallback。</p>
+  </div>
+</section>
+
+<!-- ============ 2. PROBLEM ============ -->
+<section id="problem">
+  <h2 class="section-title"><span class="sec-num">§ 02</span>问题的重新定义</h2>
+
+  <p>
+    在冠脉 CT 血管成像(<span class="en">CCTA</span>)中,心脏运动伪影是导致图像质量下降的首要原因 ——
+    尤其是在心率高或心律不齐的患者身上,而这恰恰就是 TAVI 的典型老年人群。
+    现有方法把这个问题当作一个确定性的图像恢复任务,产出一张修复后的图像,
+    但不附带任何置信度信息。这在临床上制造了一个沉默的失败模式:
+    医生无法区分"模型正确地修复了这个区域"和"模型幻觉出一个看起来合理但是错的解剖结构"。
+  </p>
+
+  <h3 class="sub">重新定义</h3>
+
+  <p>
+    我们提议把运动校正重新 framing 成一个<em>条件后验采样</em>问题,
+    而不是一个点估计问题。模型不再产出一张修复图,
+    而是产出一个在"给定运动退化输入"条件下"所有合理修复结果"的分布。
+    从这个分布里,可以原生地、理论自洽地得到三样东西:
+  </p>
+
+  <ul class="stylized">
+    <li>通过后验均值得到<strong>点估计</strong>(可以无缝嵌入现有临床工作流)</li>
+    <li>通过后验方差得到<strong>体素级不确定性图</strong>(新颖,且临床可用)</li>
+    <li><strong>Selective prediction 行为</strong>:当不确定性很高时,模型可以选择"放弃"或"标记给医生复核",而不是默默地幻觉出一个错的结果</li>
+  </ul>
+
+  <p>
+    这条路线的理论基础已经很成熟:Chung 等人的
+    <em>Diffusion Posterior Sampling</em>(ICLR 2023)以及
+    2024–2025 年一系列关于 diffusion 先验用于 Bayesian 逆问题的后续工作,
+    给了我们把"运动校正"形式化为后验推断任务的严格框架。
+    缺的只是 3D 心脏场景下的具体 instantiation,以及临床上有意义的下游验证。
+  </p>
+</section>
+
+<!-- ============ 3. LANDSCAPE ============ -->
+<section id="landscape">
+  <h2 class="section-title"><span class="sec-num">§ 03</span>SOTA 全景</h2>
+
+  <p>
+    心脏 CT 运动伪影校正这个 niche 自 2021 年以来范式一直稳定:
+    以 CNN/U-Net 为 backbone,叠加 spatial transformer 网络来学习运动场,
+    在物理模拟的合成 paired 数据(干净 CT + 人工添加伪影)上训练。
+    每年的新论文都是在前一年的基础上做边际改进,没有范式变化。
+    下面是当前 SOTA 与你提议方法的横向对比。
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>方法 · Venue</th>
+          <th>主干 / 数据</th>
+          <th>Framing</th>
+          <th>不确定性</th>
+          <th>评估</th>
+          <th>代码</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="method-name">TT U-Net<small>Deng et al. · TMI 2023</small></td>
+          <td>3D U-Net + temporal self-attention<br><small>PAD pipeline,SSIM 84% / Dice 81%</small></td>
+          <td>多相位 video deblurring</td>
+          <td><span class="pill no">无</span></td>
+          <td>PSNR / SSIM / Dice-RCA</td>
+          <td><span class="pill yes">开源</span></td>
+        </tr>
+        <tr>
+          <td class="method-name">ATOM<small>Gong et al. · PMB 2024</small></td>
+          <td>U-Net + attention gate + STN<br><small>Mayo 私有数据,71 例 DSCT</small></td>
+          <td>跨相位时空信息</td>
+          <td><span class="pill no">无</span></td>
+          <td>SSIM / DSC / Likert</td>
+          <td><span class="pill no">闭源</span></td>
+        </tr>
+        <tr>
+          <td class="method-name">TW-MoCoNet<small>Yao et al. · JIIM 2025</small></td>
+          <td>时间加权 CNN + STN<br><small>67 例临床数据</small></td>
+          <td>确定性校正</td>
+          <td><span class="pill no">无</span></td>
+          <td>PSNR / SSIM / MAS / Likert</td>
+          <td><span class="pill no">闭源</span></td>
+        </tr>
+        <tr>
+          <td class="method-name">HM-EDM<small>Chen et al. · AMAI@MICCAI 2024 / CMIG 2025</small></td>
+          <td>3D EDM + channel concat 条件<br><small>头部 CT 100 例,brain SSIM 0.17→0.51</small></td>
+          <td>条件生成(头部 rigid)</td>
+          <td><span class="pill partial">隐式(未利用)</span></td>
+          <td>MAE / SSIM / 5 例 reader</td>
+          <td><span class="pill yes">开源</span></td>
+        </tr>
+        <tr>
+          <td class="method-name">ProDM<small>Gong et al. · arXiv 2512.24948,Dec 2025</small></td>
+          <td>BBDM(bridge diffusion)+ 钙化一致性 loss<br><small>Stanford COCA 435 例,non-contrast,2.5D patch</small></td>
+          <td>钙化点修复(non-gated chest CT)</td>
+          <td><span class="pill no">无</span></td>
+          <td>Agatston MAE / 风险分级 / 30 例 reader</td>
+          <td><span class="pill partial">未明示</span></td>
+        </tr>
+        <tr style="background: rgba(180, 71, 42, 0.08);">
+          <td class="method-name" style="color: var(--accent);"><strong>我们(提议)</strong><small>目标:CVPR / MICCAI / TMI</small></td>
+          <td>3D 条件 <em>latent</em> diffusion<br><small>ImageCAS 1000 例 contrast CCTA + 改进 PAD</small></td>
+          <td>single-phase 后验采样 + lumen-aware</td>
+          <td><span class="pill yes">理论严格(BIPSDA-style)</span></td>
+          <td>+ 下游 stenosis / TAVI landmark</td>
+          <td><span class="pill yes">开源</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout insight">
+    <span class="callout-label">关键观察(基于全文精读)</span>
+    <p>
+      <strong>TT U-Net</strong> 把这个问题 framing 成 video deblurring,要求多相位 dynamic CT 输入,
+      不适用于临床 99% 的 single-phase ECG-gated CCTA。其 ablation 显示去掉 temporal information 后
+      SSIM 退化到 73-81%、Dice 退化到 73-76% —— 这给了你 single-frame diffusion 应当达到的下限基准。
+    </p>
+    <p>
+      <strong>HM-EDM</strong> 是头部 CT 刚性运动,brain SSIM 仅 0.17→0.51,workshop 起步、CMIG 扩刊。
+      方法本质就是 "EDM + channel-concat conditioning + 128×128×50 patch-wise 训练",
+      在 A100 32GB 跑得动 —— 这意味着你的 A6000 48GB 完全可以 reproduce 同样的 setup,
+      把它当作 method-level baseline 而不是无法逾越的 SOTA。
+    </p>
+    <p>
+      <strong>ProDM</strong> 的 scope 与你完全不重叠:non-contrast COCA 钙化评分 vs contrast CCTA lumen/stenosis。
+      他们的 motion engine <em>只动钙化点</em>(inpaint 钙化 → 在每个投影角度按 trajectory 重新插入 → Radon),
+      背景静止,这种简化对你的 task 不可用 —— 你必须用 PAD 的全心运动建模。
+      但他们的 task-driven differentiable loss 哲学(volume score 作为可微 surrogate of Agatston score)
+      给了你设计 lumen-aware loss 的灵感。
+    </p>
+  </div>
+</section>
+
+<!-- ============ 4. GAPS ============ -->
+<section id="gaps">
+  <h2 class="section-title"><span class="sec-num">§ 04</span>三个研究空白</h2>
+
+  <p>
+    在 IEEE Xplore、PubMed、arXiv、MICCAI 会议录里做了五轮针对性搜索之后,
+    2023 到 2026 年心脏 CT 运动校正这个 niche 里同时存在三个结构性空白。
+    每一个都是独立可发表的,三个加在一起构成了一篇论文的完整骨架。
+  </p>
+
+  <div class="three-up">
+    <div class="gap-card">
+      <div class="num">01</div>
+      <h4>没有 gated CCTA + lumen 评估的 diffusion 方法</h4>
+      <p>
+        HM-EDM(2024)做了头部刚性,ProDM(Dec 2025)做了 non-contrast COCA 钙化点。
+        但 <em>gated CCTA + 非刚性 cyclic motion + lumen/stenosis 评估</em>这个组合
+        完全空白。Latent space variant 也无人尝试。
+      </p>
+    </div>
+    <div class="gap-card">
+      <div class="num">02</div>
+      <h4>没有任何不确定性量化</h4>
+      <p>
+        所有被审查的方法都只产出点估计。没有任何工作报告 calibration、
+        体素级 uncertainty、或 selective prediction 行为 ——
+        尽管这些是临床下游决策中真正关键的东西。
+      </p>
+    </div>
+    <div class="gap-card">
+      <div class="num">03</div>
+      <h4>没有下游任务评估</h4>
+      <p>
+        所有现有评估都停留在 PSNR、SSIM 或医生 Likert 打分层面。
+        没有一篇问"修复后的图像是不是真的让下游任务(landmark、
+        segmentation、stenosis detection)更准"。这才是最有临床意义的指标。
+      </p>
+    </div>
+  </div>
+
+  <p>
+    每一个空白对应论文里的一个 novelty 主张。重要的是,
+    它们是<em>互补的</em>而不是重复的:空白 1 是方法论层面,空白 2 是概率论层面,
+    空白 3 是评估方法学层面。审稿人拒绝其中一个,不足以让另外两个自动失效。
+  </p>
+</section>
+
+<!-- ============ 5. PROPOSAL ============ -->
+<section id="proposal">
+  <h2 class="section-title"><span class="sec-num">§ 05</span>方法构想</h2>
+
+  <h3 class="sub">架构</h3>
+
+  <p>
+    一个 3D 条件 latent diffusion 模型,作用于心脏 CT volume 上。
+    整个 pipeline 被刻意设计成模块化的,以适配单张 A6000 的算力预算:
+  </p>
+
+  <ol class="stylized">
+    <li><strong>3D 自编码器(VAE-KL 或 VQ-VAE)</strong> ——
+    在 ImageCAS 上预训练,把 256×256×128 的 volume 压缩到大约 32×32×16 的 latent space。
+    用 HU-preserving 的重建损失训练一次,保护下游任务依赖的 intensity fidelity。
+    这是整个 pipeline 里唯一不可回头的前置成本。</li>
+
+    <li><strong>Latent-space denoiser</strong> ——
+    3D U-Net,在最低分辨率层加 self-attention。
+    通过 channel concatenation(HM-EDM 风格)和/或 cross-attention(SD-ControlNet 风格)
+    把运动退化的 latent 作为条件注入。具体哪种效果更好通过 ablation 确定。</li>
+
+    <li><strong>推断时做后验采样</strong> ——
+    用不同的 noise seed 跑 N 次(N ≈ 8–16)reverse process,得到一个样本集合。
+    后验均值给出点估计,后验方差给出不确定性图。</li>
+
+    <li><strong>可选:DPS 风格的 guidance</strong> ——
+    对于解剖学上高度约束的区域(比如 aortic annulus),可以在 reverse SDE 里注入
+    measurement likelihood 项做硬数据一致性,参考 Chung et al.(ICLR 2023)。</li>
+  </ol>
+
+  <h3 class="sub">为什么选 latent 而不是 pixel-space</h3>
+
+  <p>
+    A6000 有 48 GB 显存。在 256³ volume 上做 pixel-space 3D diffusion 要求 batch size 1,
+    FP16 下显存占用大约在 30–60 GB 之间,基本没有余量。
+    Latent diffusion 把活跃 volume 压缩了约 64 倍,让你可以用 batch size 4–8,
+    迭代速度快一个数量级。MONAI 的 <code>GenerativeModels</code> 库
+    提供了已经经过生产验证的 3D LDM 模板,你可以在几天内而不是几周内适配好。
+  </p>
+
+  <h3 class="sub">为什么不走 Path B(unconditional prior + posterior sampling)</h3>
+
+  <p>
+    Path B 在直觉上更优雅 —— 只需 clean data 训 prior,推断时通过 posterior sampling 直接处理真实带伪影图。
+    但 cardiac CT 在严格意义上需要可微的 motion-coupled forward operator,
+    且 ImageCAS 只有重建后的 DICOM,没有 raw projections,无法直接做 sinogram-domain DPS。
+  </p>
+
+  <p>
+    最近的 <em>C2F-MC</em>(Wang & Tamir, arXiv 2505.15057, May 2025)在 cardiac MRI 上用 alternating minimization
+    跑通了非刚性 motion + DPS,但他们关键依赖 k-space 的线性物理一致性(<code>y = M·F·S·Φ·x</code>),
+    且训练用了 8 块 V100 跑 48 小时。CT image-domain 没有等价的物理手柄,工程量是他们的 2-3 倍。
+  </p>
+
+  <p>
+    在论文 Introduction 里可以这样优雅地切割 scope:
+  </p>
+
+  <div class="callout insight" style="font-size: 14px;">
+    <p style="margin-bottom: 0;">
+      "Recent work (Wang &amp; Tamir, 2025) has demonstrated diffusion-based posterior sampling for non-rigid motion correction
+      in cardiac MRI by exploiting the linear k-space forward operator. CT motion correction lacks an equivalent
+      measurement-domain handle: ImageCAS provides only reconstructed DICOM volumes, and the cardiac CT forward operator
+      (motion-coupled forward projection + FBP) is non-linear and view-dependent. Adapting posterior sampling frameworks
+      to this setting requires reconstructing differentiable forward operators from synthetic sinograms — a substantial
+      engineering investment beyond the scope of this work. We instead propose a conditional latent diffusion approach
+      that operates entirely in the image domain..."
+    </p>
+  </div>
+
+  <p>
+    这段话写出来,你既 cite 了最 frontier 的工作,又 elegantly 解释了为什么不走 Path B,
+    审稿人没法说你"忽视了 SOTA"。Path B-lite(image-domain 伪 forward)可以作为 ablation 子节出现,
+    展示你考虑过更激进的路线但发现工程性价比不够。
+  </p>
+
+  <p>
+    精读三篇论文后,有几个具体的方法学元素可以直接借鉴或改造,无需从零发明:
+  </p>
+
+  <ul class="stylized">
+    <li><strong>HM-EDM 的 patch-wise 3D EDM template 可直接 reproduce</strong>。他们用 128×128×50 patches、
+    EDM 框架、channel concat 条件、A100 32GB 跑通 —— 你的 A6000 48GB 可以直接迁移到 cardiac 设置。
+    EDM 的 σ schedule 和 preconditioning(σ-dependent skip scaling)是工程细节,不需要重新发明。</li>
+
+    <li><strong>ProDM 的 task-driven differentiable loss 哲学可改造为 lumen-aware loss</strong>。
+    他们用可微 volume score 作为 Agatston score 的 surrogate(λ=20,sigmoid mask of HU≥130);
+    你可以设计 differentiable centerline / lumen Dice / cross-section diameter loss
+    作为 stenosis grading 的 surrogate。这是 ProDM 没有的、且和你的 task 强相关的 angle。</li>
+
+    <li><strong>BBDM/I2SB 风格 vs 标准 conditional LDM 是 method delta 的关键选择</strong>。
+    ProDM 用的是 BBDM(从干净直接扩散到带伪影,bridge-style);你应该选标准 conditional LDM
+    (从 Gaussian 噪声起步,把 motion-corrupted 作为 condition),保持 methodological distinction。
+    BBDM/I2SB 可以作为 baseline 出现在对比表里。</li>
+
+    <li><strong>2.5D patch + sliding window inference 是单 GPU 跑 cardiac diffusion 的事实标准</strong>。
+    ProDM 用 64×64×3 patch,HM-EDM 用 128×128×50 patch,两个都用 sliding window。
+    Full 3D 在单卡上不现实,这是领域共同限制,不需要为此焦虑。</li>
+  </ul>
+</section>
+
+<!-- ============ 6. DATA ============ -->
+<section id="data">
+  <h2 class="section-title"><span class="sec-num">§ 06</span>数据与可复现性</h2>
+
+  <p>
+    数据这一环的现实条件对这个方向异常有利 —— 这也是它能通过可行性筛查、
+    而其他几个候选方向(3D 心脏 MRI-CT synthesis、TAVI benchmark 构建等)
+    没能通过的关键原因。
+  </p>
+
+  <h3 class="sub">训练数据来源</h3>
+
+  <ul class="stylized">
+    <li><strong>ImageCAS</strong> —— 1000 例高分辨率 CCTA,在 Kaggle 上公开可下载,
+    Apache 2.0 license,附带冠脉分割标签。</li>
+
+    <li><strong>PAD 运动模拟 pipeline</strong> —— TT U-Net 作者 Deng 等人开源在 GitHub 上。
+    2025 年 4 月他们明确更新了 README,推荐和 ImageCAS 配合使用。
+    你可以生成数量上无限制的 (干净图, 带伪影图) paired 训练数据。</li>
+
+    <li><strong>XCAT phantom</strong> —— PAD 需要它来构建 4D 统计形状模型。
+    学术用途免费但需要向 Duke(Segars 组)申请。
+    <strong>先问一下 Pascal 和 Carlos</strong> —— LTSI 很可能已经有 license。</li>
+  </ul>
+
+  <h3 class="sub">下游评估数据</h3>
+
+  <p>
+    下游任务评估有多个公开选项:
+  </p>
+
+  <ul class="stylized">
+    <li><strong>ImageCAS 自带的冠脉分割标签</strong> ——
+    直接可以回答"运动校正是不是真的改善了分割精度"这个问题。</li>
+
+    <li><strong>TotalSegmentator 预训练模型</strong> ——
+    可以在 ImageCAS 上直接产出 whole-heart 分割,不需要任何新标注,
+    就能衡量 chamber 层面的提升。</li>
+
+    <li><strong>你自己的 TAVI landmark 工作</strong> ——
+    如果你的 landmark detector 能在 ImageCAS 的几何条件下跑
+    (哪怕是 zero-shot 或轻度 fine-tune),运动校正对 landmark 误差的影响就变成
+    对临床价值的直接度量。<em>这是整篇论文的 killer figure</em>。</li>
+  </ul>
+
+  <div class="callout finding">
+    <span class="callout-label">一个重要的 framing 资产</span>
+    <p>
+      2023 年 Nature <em>Scientific Reports</em> 上有一篇关于 SSF2 运动校正算法的论文,
+      明确用实验证明了:<em>运动伪影会直接损害 TAVI 术前 aortic annulus 测量的精度</em>,
+      而且按心率做了分层量化。这就是你论文 introduction 的临床 motivation,
+      一字不差地写在一份高影响力期刊的论文里。引用它,
+      整篇论文的临床意义就锚定在 TAVI 这个具体场景,
+      而不是泛泛的"image quality improvement"。
+    </p>
+  </div>
+</section>
+
+<!-- ============ 7. NOVELTY ============ -->
+<section id="novelty">
+  <h2 class="section-title"><span class="sec-num">§ 07</span>可辩护的 Novelty</h2>
+
+  <p>
+    三个"first"主张,每一个截至 2026 年 4 月的文献都可以独立验证:
+  </p>
+
+  <ol class="stylized">
+    <li><strong>gated CCTA 的第一个条件 latent diffusion 方法,聚焦 lumen 与 stenosis 评估。</strong>
+    HM-EDM(2024)是头部 CT 刚性运动,pixel-space EDM,brain SSIM 仅 0.51。
+    ProDM(Dec 2025)是 non-contrast COCA 钙化评分,motion engine 只动钙化点,
+    使用 BBDM bridge 框架。我们的工作是 contrast-enhanced gated CCTA、
+    标准 conditional LDM、非刚性全心运动建模、目标 lumen 几何精度。
+    Method 与 scope 均显著区分。</li>
+
+    <li><strong>心脏运动校正领域的第一个理论严格的后验采样不确定性。</strong>
+    心脏运动校正文献里没有任何先前工作(包括 HM-EDM、ProDM)提供 uncertainty。
+    你的方法里的 uncertainty 在理论上 grounded 在 diffusion posterior sampling,
+    辅以 BIPSDA-style calibration(reliability diagram、coverage probability),
+    而不是一个 TTA 或 MC-Dropout 的后处理 trick 贴在确定性模型上。</li>
+
+    <li><strong>第一个下游任务感知的评估协议(以 lumen-aware differentiable loss 为方法层抓手)。</strong>
+    提出并验证一个新的评估框架:不仅报 PSNR/SSIM,还报修复后冠脉分割 Dice、
+    stenosis grading 一致性、TAVI landmark 精度变化。
+    并设计可微的 lumen-geometry-aware loss(借鉴 ProDM 的 task-driven loss 哲学,
+    但目标是 sub-millimeter 几何精度而非 HU 阈值保留),作为方法层的具体实现。
+    这个贡献即使剥离你的方法本身,也可以被社区独立采用。</li>
+  </ol>
+
+  <h3 class="sub">为什么是三个主张而不是一个</h3>
+
+  <p>
+    单一的 novelty 主张很脆弱 —— 一个对 diffusion 用于逆问题持怀疑态度的审稿人
+    就能杀掉整篇论文。三个正交的主张制造了冗余:
+    即使一个主张被拒,另外两个仍然站得住,论文的贡献依然清晰。
+    这是顶级医学影像 venue 里的标准打法,对你有利。
+  </p>
+</section>
+
+<!-- ============ 8. RISKS ============ -->
+<section id="risks">
+  <h2 class="section-title"><span class="sec-num">§ 08</span>风险与退路</h2>
+
+  <p>
+    诚实地盘点可能出错的地方,以及真的出错时的应对方案。
+  </p>
+
+  <div class="risks">
+    <div class="risk-row">
+      <div>
+        <div class="rlabel">技术风险 · 高</div>
+        <div class="rname">VAE 重建保真度</div>
+      </div>
+      <div>
+        Latent 压缩会引入 HU 重建误差。如果这个误差超过了运动伪影本身的幅度,
+        整个 latent 路线就崩了 —— 你相当于在修复比你自己重建噪声还小的伪影。
+      </div>
+      <div>
+        <strong>退路。</strong>退到 pixel-space diffusion,在 cropped 心脏 ROI
+        (比如 128×128×96)上做,A6000 能跑,batch size 1。迭代慢但排除了 VAE 作为混淆因素。
+        或者:给 VAE 明确加 HU-preserving loss,并在主实验前先做一轮 sanity check 报告重建保真度。
+      </div>
+    </div>
+
+    <div class="risk-row">
+      <div>
+        <div class="rlabel">定位风险 · 低-中</div>
+        <div class="rname">HM-EDM 的 generalization 主张</div>
+      </div>
+      <div>
+        审稿人可能会说:HM-EDM 已经证明了 diffusion 对 CT motion correction work,
+        你扩展到心脏只是 incremental。
+      </div>
+      <div>
+        <strong>退路。</strong>HM-EDM 是 workshop-quality 的 proof-of-concept(brain SSIM 0.51、
+        100 例、5 例 reader study),不是一个 method-complete 的 SOTA。
+        强调多重区别:非刚体 vs 刚体运动、心脏 vs 头部、latent vs pixel space、
+        principled UQ(他们没做)、downstream 评估(他们没做)、lumen-aware loss(他们没做)。
+        把 HM-EDM 当作 baseline template 直接 reproduce 在 cardiac 上跑一遍,
+        展示它在心脏几何上的失败模式即可。
+      </div>
+    </div>
+
+    <div class="risk-row">
+      <div>
+        <div class="rlabel">技术风险 · 中</div>
+        <div class="rname">PAD pipeline 可复现性</div>
+      </div>
+      <div>
+        TT U-Net 代码库有一部分是 MATLAB(用于 shape model fitting),
+        而且需要 XCAT phantom 的 license。复现它可能比预期耗时。
+      </div>
+      <div>
+        <strong>退路。</strong>更简单的运动模拟方案 —— 直接用 DVF warp + forward projection,
+        跳过 4D SSM 那一步。真实度略低,但对一篇方法论文已经够用。
+        或者:直接联系 Deng 实验室合作,他们在 2025 年 4 月主动更新 README 推广 ImageCAS 适配,
+        说明他们对合作是开放的。
+      </div>
+    </div>
+
+    <div class="risk-row">
+      <div>
+        <div class="rlabel">被抢发风险 · 中</div>
+        <div class="rname">MGH 或 Northwestern 组先发表 cardiac 扩展</div>
+      </div>
+      <div>
+        HM-EDM 团队(Z. Chen / Dufan Wu / Q. Li)有 CT motion correction 经验,
+        ProDM 团队(Bo Zhou / Northwestern)已经把 diffusion + cardiac CT + downstream evaluation
+        这个 pattern 跑通了。两个组都可能在 6 个月内挂出 gated CCTA 版本的 arXiv。
+      </div>
+      <div>
+        <strong>退路。</strong>速度优先 —— 4-5 个月内挂 arXiv 占位。
+        即使被抢发主方法,你独有的 UQ 章节(BIPSDA-style calibration)和
+        TAVI landmark 下游评估两条腿仍然站得住。
+        ProDM 团队偏 pulmonary/preventive medicine,做 CCTA + TAVI 的概率比 MGH 低。
+        真正的威胁是 MGH 的 HM-EDM 团队。
+      </div>
+    </div>
+
+    <div class="risk-row">
+      <div>
+        <div class="rlabel">临床风险 · 低</div>
+        <div class="rname">合成到真实的泛化</div>
+      </div>
+      <div>
+        PAD 生成的是合成运动伪影。你的模型在这些数据上训练,
+        可能泛化不到真实临床运动伪影,因为真实伪影的统计分布更复杂。
+      </div>
+      <div>
+        <strong>退路。</strong>这是整个领域共同的 limitation —— ProDM 的 reader study(30 例,
+        2 名放射科医生)在真实 non-gated 上只拿到 Likert 2.97/2.78/2.91,
+        即 "some motion artifacts remain but mostly clean",
+        他们自己也承认 "may require more extensive simulation pipelines"。
+        你的论文即使在真实数据上拿到类似的 3 分左右,也是可发表的结果,
+        不需要做到 4-5 分。如果 Rennes 能给一些真实临床数据做 reader study 最好,
+        不然就依赖 PAD 本身被社区认可的 realism。
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9. TIMELINE ============ -->
+<section id="timeline">
+  <h2 class="section-title"><span class="sec-num">§ 09</span>投稿时间线</h2>
+
+  <p>
+    一份按月排布的现实计划,假设单卡 A6000、已有的 diffusion 经验、
+    以及 ImageCAS + PAD pipeline 作为数据基础。
+    预算里包含了"VAE 重建保真度问题"这种几乎必然出现的 debugging 缓冲。
+  </p>
+
+  <div class="timeline">
+    <div class="tl-item now">
+      <div class="tl-month">2026 年 4 月 · 当前</div>
+      <div class="tl-title">文献锚定与数据获取</div>
+      <div class="tl-body">
+        下载 ImageCAS。Clone TT U-Net repo,在几个样本 volume 上试运行 PAD pipeline。
+        申请 XCAT phantom access(或者先问 Pascal 和 Carlos 有没有)。
+        仔细读 HM-EDM 论文。读 DPS 以及相关的 diffusion posterior sampling 后续论文。
+        在 Zotero 里建一个这个 niche 的文献库。
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-month">2026 年 5 月</div>
+      <div class="tl-title">3D VAE 在 ImageCAS 上训练</div>
+      <div class="tl-body">
+        基于 MONAI GenerativeModels 的 3D VAE 模板适配。
+        用 HU-preserving loss 在 ImageCAS 上训练。严格验证重建保真度 ——
+        这是整个 latent 路线的 go/no-go gate。
+        如果 VAE 保真度不够,立刻切换到 pixel-space cropped ROI。
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-month">2026 年 6 – 7 月</div>
+      <div class="tl-title">条件 latent diffusion 训练</div>
+      <div class="tl-body">
+        在 PAD 生成的 (带伪影, 干净) latent pair 上训练 denoiser。
+        Ablate 条件注入方式(channel concat vs cross-attention)。
+        建立和 TT U-Net 可比的 PSNR/SSIM baseline。
+        绝大部分算力预算消耗在这一阶段。
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-month">2026 年 8 月</div>
+      <div class="tl-title">后验采样与不确定性验证</div>
+      <div class="tl-body">
+        实现 N-sample 后验推断。验证后验方差确实和真实重建误差相关。
+        和 TTA 以及 MC-Dropout baseline 做对比
+        (你的 Yahui 师姐线索意味着你知道怎么严格地做这件事)。
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-month">2026 年 9 月</div>
+      <div class="tl-title">下游任务评估</div>
+      <div class="tl-body">
+        用 ImageCAS 自带的冠脉分割标签跑修复后 vs 未修复的对比。
+        用 TotalSegmentator 做全心脏分析。
+        如果可能,在自己的 TAVI landmark detector 上评估下游影响 ——
+        这是论文的 killer figure。
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-month">2026 年 10 月</div>
+      <div class="tl-title">撰写与 baseline 复现</div>
+      <div class="tl-body">
+        起草论文。在你的 test set 上复现 TT U-Net 和 HM-EDM 作为 baseline。
+        这一步通常会比预期更慢 —— 预留完整一个月。
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-month">2026 年 11 月</div>
+      <div class="tl-title">打磨、rebuttal 材料、投稿</div>
+      <div class="tl-body">
+        最终实验、图表打磨、补充材料。
+        主目标:MICCAI 2027(一月初 deadline)。
+        次目标:CVPR 2027(十一月 deadline),如果节奏允许就两个一起投。
+      </div>
+    </div>
+  </div>
+
+  <div class="callout insight">
+    <span class="callout-label">战略提示</span>
+    <p>
+      这条时间线是和你的 TAVI landmark detection 工作(TRUST 论文)
+      <em>并行</em>的,不是替代。两者应该互相喂养:
+      运动校正改善 landmark detection,而 landmark detection 则给运动校正论文提供它的 killer downstream metric。
+      这是罕见的两篇博士论文真正彼此增强、而不是争夺你的注意力的情况。
+    </p>
+  </div>
+</section>
+
+<!-- ============ FOOTER ============ -->
+<footer>
+  <div>
+    博士代表作战略简报 · CMZ · LTSI Rennes<br>
+    <strong>V2</strong>:2026 年 4 月 · 三篇核心论文(TT U-Net / HM-EDM / ProDM)+ C2F-MC 全文精读后修订<br>
+    随着该 niche 的演化,内容可能需要修订
+  </div>
+  <div class="sig">
+    — 一份工作文档,不是合同
+  </div>
+</footer>
+
+</div>
+</body>
+</html>

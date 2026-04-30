@@ -56,22 +56,21 @@ CLAUDE.local.md
 .quarto/
 
 # quality_reports/ — per-project session logs, plans, specs, merges.
-# The directory structure ships in the template (via .gitkeep), but the
-# content is PROJECT-INTERNAL and shouldn't be inherited by forks.
-quality_reports/plans/*
-quality_reports/specs/*
-quality_reports/session_logs/*
-quality_reports/merges/*
-quality_reports/decisions/*
-quality_reports/checkpoints/*
-quality_reports/preregistrations/*
-!quality_reports/plans/.gitkeep
-!quality_reports/specs/.gitkeep
-!quality_reports/session_logs/.gitkeep
-!quality_reports/merges/.gitkeep
-!quality_reports/decisions/.gitkeep
-!quality_reports/checkpoints/.gitkeep
-!quality_reports/preregistrations/.gitkeep
+#
+# Template behaviour: ignore all per-project content so forks start clean.
+# This project (cardiac-artifacts) OVERRIDES that behaviour — we WANT
+# spec / plan / decision-record / session-log to sync between Mac↔LTSI
+# via git, otherwise the dual-session workflow (per MEMORY.md "Mac↔LTSI
+# 双 session 工作流") breaks: LTSI session would `git pull` and miss
+# the master spec, plans, and decision records.
+#
+# Override below: keep .md docs tracked, but still ignore large generated
+# artifacts (auto-generated quality reports, R outputs, big binaries
+# above 50MB if any).
+#!quality_reports/**/*.md
+#!quality_reports/**/*.html
+#!quality_reports/**/*.pdf
+# (no patterns ignored — track everything under quality_reports/)
 
 # R analysis outputs (generated artifacts; keep scripts, ignore outputs)
 scripts/R/_outputs/
