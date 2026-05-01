@@ -90,6 +90,7 @@ def _autoencoderkl_check() -> tuple[bool, str]:
             num_channels=(32, 64),
             latent_channels=4,
             num_res_blocks=1,
+            attention_levels=(False, False),  # required since monai-generative 0.2.3
         )
         n_params = sum(p.numel() for p in m.parameters())
         return True, f"  [OK]   AutoencoderKL toy 2D model: {n_params:,} parameters"

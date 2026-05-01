@@ -155,3 +155,165 @@
   doi       = {10.1038/s41598-023-30786-7},
   note      = {SSF2 algorithm. HR-stratified quantitative analysis. Cited as clinical motivation in our intro.}
 }
+
+% =============================================================================
+% PARAMETRIC SIMULATION ANTECEDENTS (added 2026-05-01 from lit-review)
+% Source: quality_reports/lit_review_parametric-cardiac-CT-motion-simulation.md
+% =============================================================================
+
+% Lossau 2019 (MedIA) — CoMoFACT, the closest published antecedent for our
+% parametric DVF + forward-model approach. Operates on coronary-segment
+% patches; we generalize to whole-heart volumes for 3D latent diffusion.
+% Verified 2026-05-01 via CoVe (PubMed PMID 30471464, Crossref).
+@article{Lossau2019_CoMoFACT,
+  author    = {Lossau, T. and Nickisch, H. and Wissel, T. and Bippus, R. and Schmitt, H. and Morlock, M. and Grass, M.},
+  title     = {{Motion Artifact Recognition and Quantification in Coronary CT Angiography Using Convolutional Neural Networks}},
+  journal   = {Medical Image Analysis},
+  volume    = {52},
+  pages     = {68--79},
+  year      = {2019},
+  doi       = {10.1016/j.media.2018.11.003},
+  note      = {CoMoFACT forward-simulation model. Coronary-segment-patch level. Closest parametric-DVF antecedent for our work.}
+}
+
+% Lossau 2019 (CMIG) — CoMPACT, follow-up motion estimation/compensation
+% trained on CoMoFACT-simulated patches.
+% Verified 2026-05-01 via CoVe — initial DOI was wrong (pointed to fundus
+% paper); corrected to 10.1016/j.compmedimag.2019.06.001 (vol 76:101640).
+@article{Lossau2019_CoMPACT,
+  author    = {Lossau, T. and Nickisch, H. and Wissel, T. and Bippus, R. and Schmitt, H. and Morlock, M. and Grass, M.},
+  title     = {{Motion Estimation and Correction in Cardiac CT Angiography Images Using Convolutional Neural Networks}},
+  journal   = {Computerized Medical Imaging and Graphics},
+  volume    = {76},
+  pages     = {101640},
+  year      = {2019},
+  doi       = {10.1016/j.compmedimag.2019.06.001},
+  note      = {Patch-level 2D motion-vector estimation; iterative comp pipeline. Phantom 13.4°/0.77 mm; clinical 34.9°/1.86 mm.}
+}
+
+% Hahn 2017 — PAR + low-degree-polynomial motion model along coronary
+% centerline. Same forward-simulation philosophy as ours, different
+% parameterization.
+% Verified 2026-05-01 via CoVe + Crossref.
+@article{Hahn2017_PAMoCo,
+  author    = {Hahn, Juliane and Bruder, Herbert and Rohkohl, Christopher and Allmendinger, Thomas and Stierstorfer, Karl and Flohr, Thomas and Kachelrie{\ss}, Marc},
+  title     = {{Motion Compensation in the Region of the Coronary Arteries Based on Partial Angle Reconstructions from Short-Scan CT Data}},
+  journal   = {Medical Physics},
+  volume    = {44},
+  number    = {11},
+  pages     = {5795--5813},
+  year      = {2017},
+  doi       = {10.1002/mp.12514},
+  note      = {PAMoCo. Vessel-centerline polynomial motion model.}
+}
+
+% Maier 2021 — Deep PAMoCo. Deep-learning extension of Hahn 2017.
+% Verified 2026-05-01 via CoVe + Crossref: vol 48(7):3559-3571.
+% NEEDS-MANUAL-CHECK: full author list (only Joscha Maier confirmed as
+% first author); the "100k samples / 25 reconstructions" specific number
+% needs PDF-level verification.
+@article{Maier2021_DeepPAMoCo,
+  author    = {Maier, Joscha and others}, % NEEDS-MANUAL-CHECK
+  title     = {{Deep Learning-Based Coronary Artery Motion Estimation and Compensation for Short-Scan Cardiac CT}},
+  journal   = {Medical Physics},
+  volume    = {48},
+  number    = {7},
+  pages     = {3559--3571},
+  year      = {2021},
+  doi       = {10.1002/mp.14927},
+  note      = {Deep PAMoCo. ~25 HU error on simulated data.}
+}
+
+% Maier 2025 — Single-view-temporal-resolution extension of Deep PAMoCo.
+% Verified 2026-05-01 via CoVe + Crossref.
+@article{Maier2025_DeepCBCT,
+  author    = {Maier, Joscha and Sawall, Stefan and Arheit, Marcel and Paysan, Pascal and Kachelrie{\ss}, Marc},
+  title     = {{Deep Learning-Based Cone-Beam CT Motion Compensation with Single-View Temporal Resolution}},
+  journal   = {Medical Physics},
+  volume    = {52},
+  number    = {7},
+  year      = {2025},
+  doi       = {10.1002/mp.17911},
+  note      = {Most recent in PAR/PAMoCo lineage.}
+}
+
+% Yao 2023 (JACMP) — clinical phase-deviation evaluation methodology, not
+% a simulation engine. Cited for evaluation framework breadth.
+% Verified 2026-05-01 via CoVe + Crossref.
+@article{Yao2023_PhaseDeviation,
+  author    = {Yao, Xiaoling and Zhong, Sihua and Xu, Maolan and Zhang, Guozhi and Yuan, Yuan and Shuai, Tao and Li, Zhenlin},
+  title     = {{Deep Learning-Based Motion Correction Algorithm for Coronary CT Angiography: Lowering the Phase Requirement for Morphological and Functional Evaluation}},
+  journal   = {Journal of Applied Clinical Medical Physics},
+  volume    = {24},
+  number    = {9},
+  pages     = {e14104},
+  year      = {2023},
+  doi       = {10.1002/acm2.14104},
+  note      = {n=53 clinical; ±2/±4/±6/±8% phase-deviation reconstruction.}
+}
+
+% Ren 2022 — GAN trained on REAL clinical pairs (SnapShot-Freeze as GT).
+% Counter-example to all simulation-based methods.
+% Verified 2026-05-01 via CoVe + Crossref.
+@article{Ren2022_GAN,
+  author    = {Ren, Pengling and He, Yi and Zhu, Yi and Zhang, Tingting and Cao, Jiaxin and Wang, Zhenchang and Yang, Zhenghan},
+  title     = {{Motion Artefact Reduction in Coronary CT Angiography Images with a Deep Learning Method}},
+  journal   = {BMC Medical Imaging},
+  volume    = {22},
+  pages     = {184},
+  year      = {2022},
+  doi       = {10.1186/s12880-022-00914-2},
+  note      = {n=97 patients; GAN trained on raw + SnapShot-Freeze pairs. Not simulation-based.}
+}
+
+% =============================================================================
+% LV-MECHANICS PARAMETER ANCHORS (added 2026-05-01)
+% Cited in motion_synth.py to defend MotionParams default values as
+% physiologically grounded.
+% =============================================================================
+
+% Sengupta 2008 — foundational review of LV twist mechanics.
+% Verified 2026-05-01 via CoVe + Crossref.
+@article{Sengupta2008_TwistMechanics,
+  author    = {Sengupta, Partho P. and Tajik, A. Jamil and Chandrasekaran, Krishnaswamy and Khandheria, Bijoy K.},
+  title     = {{Twist Mechanics of the Left Ventricle: Principles and Application}},
+  journal   = {JACC: Cardiovascular Imaging},
+  volume    = {1},
+  number    = {3},
+  pages     = {366--376},
+  year      = {2008},
+  doi       = {10.1016/j.jcmg.2008.02.006},
+  note      = {Foundational review. Cite to defend twist parameter range.}
+}
+
+% Stöhr 2016 — speckle-tracking review of LV twist in health and disease.
+% (CoVe-corrected 2026-05-01: initial draft mistakenly cited "Stöhr 2015 Circ
+% Cardiovasc Imaging" — that DOI belongs to Omar/Vallabhajosyula/Sengupta 2015.
+% Real Stöhr review is in AJP-Heart 2016.)
+% Verified 2026-05-01 via CoVe + PubMed PMID 27402663.
+@article{Stohr2016_TwistMechanicsReview,
+  author    = {St{\"o}hr, Eric J. and Shave, Rob E. and Baggish, Aaron L. and Weiner, Rory B.},
+  title     = {{Left Ventricular Twist Mechanics in the Context of Normal Physiology and Cardiovascular Disease: A Review of Studies Using Speckle Tracking Echocardiography}},
+  journal   = {American Journal of Physiology - Heart and Circulatory Physiology},
+  volume    = {311},
+  number    = {3},
+  pages     = {H633--H644},
+  year      = {2016},
+  doi       = {10.1152/ajpheart.00104.2016},
+  note      = {Speckle-tracking review. Anchor for twist parameter (population mean ~7-8° ± 3°).}
+}
+
+% Omar 2015 — companion review on LV twist research observations and
+% clinical applications. Kept alongside Stöhr 2016 as additional anchor.
+% Verified 2026-05-01 via CoVe + Crossref.
+@article{Omar2015_TwistResearch,
+  author    = {Omar, Alaa Mabrouk Salem and Vallabhajosyula, Saraschandra and Sengupta, Partho P.},
+  title     = {{Left Ventricular Twist and Torsion: Research Observations and Clinical Applications}},
+  journal   = {Circulation: Cardiovascular Imaging},
+  volume    = {8},
+  number    = {6},
+  pages     = {e003029},
+  year      = {2015},
+  doi       = {10.1161/CIRCIMAGING.115.003029},
+  note      = {Third anchor for twist range. Same DOI mistakenly attached to Stöhr in earlier draft — fixed.}
+}

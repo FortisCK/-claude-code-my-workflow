@@ -102,3 +102,13 @@ None proposed for `MEMORY.md` from this session — all the entries in the new `
 2. If happy → `/commit "feat: adapt workflow for cardiac-CT diffusion project"`.
 3. Read the `claim-verifier` output once it lands; correct or augment the bibliography accordingly.
 4. Decide whether to download ImageCAS now (kicks off the May 2026 timeline) or to defer until after the first commit settles.
+
+
+---
+**Context compaction (auto) at 15:55**
+Check git log and quality_reports/plans/ for current state.
+
+
+---
+**Context compaction (auto) at 15:51**
+Check git log and quality_reports/plans/ for current state.

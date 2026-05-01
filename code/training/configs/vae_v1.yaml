@@ -1,0 +1,58 @@
+# vae_v1.yaml — Stage-1 KL-VAE training config for cardiac CT.
+#
+# Run-card slug placeholder: experiments/runs/<DATE>_vae_v1.md
+# (filled in at training start; see experiments-protocol.md)
+
+run:
+  slug: "vae_v1"                   # run-card slug; concrete date prepended at launch
+  seed: 42
+  device: "cuda"                   # smoke flag overrides to cpu
+
+data:
+  processed_dir: null              # null → paths.get("IMAGECAS_PROCESSED")
+  case_ids_train: null             # null → all cases - val_split
+  case_ids_val: null
+  val_split: 0.05                  # 5% holdout
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+augmentation:
+  p_flip: 0.5
+  rotate_range_deg: 5.0
+  shift_range_voxels: 2
+  intensity_shift_offset: 0.05
+
+model:
+  in_channels: 1
+  out_channels: 1
+  channels: [32, 64, 128, 128]      # multiples of norm_num_groups=32
+  num_res_blocks: [2, 2, 2, 2]
+  attention_levels: [false, false, false, true]
+  latent_channels: 4
+  norm_num_groups: 32
+  use_checkpoint: false             # set true if 48 GB tight at full batch
+
+loss:
+  recon_type: "l1"                  # 'l1' | 'l2'
+  kl_weight: 1.0e-6
+  ssim_weight: 0.1                  # MONAI SSIMLoss (1 - SSIM)
+
+optim:
+  lr: 1.0e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+
+train:
+  batch_size: 2                     # 192³ × 4 latent ch on 48 GB ≈ tight; tune
+  n_epochs: 100
+  grad_accum_steps: 1
+  amp: true                         # torch.autocast fp16
+  log_every_steps: 50
+  val_every_epochs: 5
+  ckpt_every_epochs: 10
+  ckpt_dir: "experiments/checkpoints/vae_v1"
+
+wandb:
+  project: "cardiac-vae"
+  enabled: true                     # smoke flag overrides to false

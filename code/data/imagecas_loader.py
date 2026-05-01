@@ -24,34 +24,56 @@ import SimpleITK as sitk
 
 from . import paths
 
-# --- Naming convention assumptions (TENTATIVE — verify with inspect script) ---
-# ImageCAS Kaggle dataset typically ships as:
-#   data/imagecas/raw/<case_id>/img.nii.gz        # CCTA volume
-#   data/imagecas/raw/<case_id>/label.nii.gz      # coronary segmentation
-# `<case_id>` is a numeric or alphanumeric directory name.
-#
-# If actual layout differs, update CASE_DIR_GLOB / VOLUME_FNAME / LABEL_FNAME.
+# --- Naming convention (verified 2026-04-30 LTSI session) ---
+# ImageCAS Kaggle dataset extracts into 5 batch directories:
+#   data/imagecas/raw/1-200/<id>.img.nii.gz       # CCTA volume
+#   data/imagecas/raw/1-200/<id>.label.nii.gz     # coronary segmentation
+#   data/imagecas/raw/201-400/...
+#   ... (5 batches, 200 cases each)
+# `<id>` is a numeric string like "1", "2", ..., "1000".
 
-CASE_DIR_GLOB: str = "*"
-VOLUME_FNAME: str = "img.nii.gz"
-LABEL_FNAME: str = "label.nii.gz"
+VOLUME_SUFFIX: str = ".img.nii.gz"
+LABEL_SUFFIX: str = ".label.nii.gz"
+BATCH_DIRS: tuple[str, ...] = ("1-200", "201-400", "401-600", "601-800", "801-1000")
+
+
+def _find_case_file(case_id: str, suffix: str) -> Optional[Path]:
+    """Locate a per-case file by scanning the 5 batch directories."""
+    raw = paths.get("IMAGECAS_RAW")
+    fname = f"{case_id}{suffix}"
+    for batch in BATCH_DIRS:
+        candidate = raw / batch / fname
+        if candidate.exists():
+            return candidate
+    return None
 
 
 def case_ids() -> list[str]:
-    """Return sorted list of all ImageCAS case directory names."""
+    """Return sorted list of all ImageCAS case IDs (numeric strings)."""
     raw = paths.get("IMAGECAS_RAW")
     if not raw.exists():
         raise FileNotFoundError(
             f"ImageCAS raw directory not found at {raw}. "
-            f"Either download the dataset (see data/README.md) or update "
-            f"data/.paths.local."
+            f"Either download + extract the dataset (see data/README.md) "
+            f"or update data/.paths.local."
         )
-    return sorted(p.name for p in raw.glob(CASE_DIR_GLOB) if p.is_dir())
+    ids: set[str] = set()
+    for batch in BATCH_DIRS:
+        bdir = raw / batch
+        if not bdir.exists():
+            continue
+        for img in bdir.glob(f"*{VOLUME_SUFFIX}"):
+            cid = img.name[: -len(VOLUME_SUFFIX)]
+            ids.add(cid)
+    return sorted(ids, key=lambda s: int(s) if s.isdigit() else s)
 
 
 def case_dir(case_id: str) -> Path:
-    """Return the directory for `case_id`."""
-    return paths.get("IMAGECAS_RAW") / case_id
+    """Return the batch directory containing `case_id`. Raises if not found."""
+    img = _find_case_file(case_id, VOLUME_SUFFIX)
+    if img is None:
+        raise FileNotFoundError(f"Case {case_id} not found in any batch directory.")
+    return img.parent
 
 
 def load_volume(case_id: str) -> sitk.Image:
@@ -60,19 +82,16 @@ def load_volume(case_id: str) -> sitk.Image:
     Returns the volume in HU units, with original voxel spacing and direction.
     Raises FileNotFoundError if the case is missing or the file isn't there.
     """
-    f = case_dir(case_id) / VOLUME_FNAME
-    if not f.exists():
-        raise FileNotFoundError(f"Volume file not found: {f}")
+    f = _find_case_file(case_id, VOLUME_SUFFIX)
+    if f is None:
+        raise FileNotFoundError(f"Volume file not found for case {case_id}")
     return sitk.ReadImage(str(f))
 
 
 def load_label(case_id: str) -> Optional[sitk.Image]:
-    """Load coronary-artery segmentation label, or None if not present.
-
-    Some cases in ImageCAS may lack labels — handle the None case explicitly.
-    """
-    f = case_dir(case_id) / LABEL_FNAME
-    if not f.exists():
+    """Load coronary-artery segmentation label, or None if not present."""
+    f = _find_case_file(case_id, LABEL_SUFFIX)
+    if f is None:
         return None
     return sitk.ReadImage(str(f))
 

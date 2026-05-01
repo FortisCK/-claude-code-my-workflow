@@ -1,0 +1,88 @@
+"""transforms.py — MONAI Compose pipelines for VAE / diffusion training.
+
+Two pipelines:
+    - `vae_train_transforms()`: for clean-volume VAE training.
+        random flips (3 axes), random affine (small ±5° rotations + ±2 mm shifts),
+        intensity jitter.
+    - `diffusion_train_transforms()`: for paired (clean, corrupted) diffusion training.
+        SAME geometric augmentation applied to BOTH volumes (so (z_clean, z_cond)
+        stay aligned), but only clean side gets intensity jitter.
+
+We keep augmentation light to avoid distorting the cardiac anatomy (downstream
+TAVI evaluation is sensitive to geometry).
+
+Per `.claude/rules/python-code-conventions.md` §4 — every preprocessing op
+appears in a Compose pipeline for inspectability.
+"""
+
+from __future__ import annotations
+
+from monai.transforms import (
+    Compose,
+    EnsureTyped,
+    RandAdjustContrastd,
+    RandAffined,
+    RandFlipd,
+    RandShiftIntensityd,
+)
+
+
+def vae_train_transforms(
+    p_flip: float = 0.5,
+    rotate_range_deg: float = 5.0,
+    shift_range_voxels: int = 2,
+    intensity_shift_offset: float = 0.05,
+) -> Compose:
+    """Augmentation pipeline for VAE training (single volume)."""
+    rotate_rad = rotate_range_deg * 3.141592653589793 / 180.0
+    return Compose(
+        [
+            RandFlipd(keys=["volume"], prob=p_flip, spatial_axis=0),
+            RandFlipd(keys=["volume"], prob=p_flip, spatial_axis=1),
+            RandFlipd(keys=["volume"], prob=p_flip, spatial_axis=2),
+            RandAffined(
+                keys=["volume"],
+                prob=0.5,
+                rotate_range=(rotate_rad, rotate_rad, rotate_rad),
+                translate_range=(shift_range_voxels,) * 3,
+                padding_mode="border",
+            ),
+            RandShiftIntensityd(keys=["volume"], offsets=intensity_shift_offset, prob=0.5),
+            RandAdjustContrastd(keys=["volume"], prob=0.3, gamma=(0.9, 1.1)),
+            EnsureTyped(keys=["volume"], dtype="float32", track_meta=False),
+        ]
+    )
+
+
+def diffusion_train_transforms(
+    p_flip: float = 0.5,
+    rotate_range_deg: float = 5.0,
+    shift_range_voxels: int = 2,
+) -> Compose:
+    """Augmentation pipeline for paired (clean, corrupted) diffusion training.
+
+    Geometric augmentations apply to BOTH `volume` and `corrupted` so they
+    remain aligned in physical space. No intensity jitter (avoid distribution
+    drift between train and inference).
+    """
+    rotate_rad = rotate_range_deg * 3.141592653589793 / 180.0
+    return Compose(
+        [
+            RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=0),
+            RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=1),
+            RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=2),
+            RandAffined(
+                keys=["volume", "corrupted"],
+                prob=0.5,
+                rotate_range=(rotate_rad, rotate_rad, rotate_rad),
+                translate_range=(shift_range_voxels,) * 3,
+                padding_mode="border",
+            ),
+            EnsureTyped(keys=["volume", "corrupted"], dtype="float32", track_meta=False),
+        ]
+    )
+
+
+def eval_transforms() -> Compose:
+    """Identity-only pipeline for evaluation (no augmentation)."""
+    return Compose([EnsureTyped(keys=["volume"], dtype="float32", track_meta=False)])
