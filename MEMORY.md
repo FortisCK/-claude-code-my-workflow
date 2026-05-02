@@ -129,3 +129,25 @@ How to apply: if a missing capability surfaces during a task, check
 - supporting papers 全文 → [`master_supporting_docs/supporting_papers/`](master_supporting_docs/supporting_papers/)
 
 LTSI session 不需要重新 onboard — 上面这些文档 self-contained 描述了项目 state。
+
+## Motion synthesis pipeline 的实际选择(2026-05-01 LTSI session 验证)
+
+[LEARN:methodology] **走 Path D(parametric DVF)而非 PAD(XCAT-based 4D-SSM)**。理由:**TT U-Net 的 4D-SSM 训练代码 NOT released**(只 release 5 个 PAD MATLAB demo 文件)— 即使付 $1000 买 XCAT license 也无法完整复现 PAD;只能在他们的 demo 输出上做 inference。这把 v1.1 spec 里的 "PAD pipeline 复现" path 实质性地 invalidate 了。Why: lit review 2026-05-01 从 TT U-Net §III-B 全文 + GitHub repo 检查得出。How to apply: 论文 framing 改为 "license-free parametric alternative to PAD"(positive framing,不是 fallback);spec MUST "PAD pipeline 单相位简化版" 改为 "parametric DVF pipeline";Operational AI #1(XCAT license ask)**RESCINDED**(任何 path 都不需要 XCAT)。
+
+[LEARN:antecedent] **Lossau 2019 (CoMoFACT, MedIA 52:68-79) is closest published antecedent**,not Deng 2023 PAD。CoMoFACT 是 coronary-segment patch 上的参数化 forward model,我们做 whole-heart volume + paired-data-for-LDM。论文 related work 必须把 Lossau 2019 / CoMPACT 2019 作为 main antecedent,Hahn 2017 / Maier 2021/2025 作为 vessel-centerline 平行 lineage。Why: 这是 pre-Lossau / post-Lossau 的 framing 轴 — reviewer 问 "why didn't you just use CoMoFACT" 的标准回答是 "patch-level vs whole-volume + 2D motion vector vs 4-component DVF + classifier vs paired LDM training"。
+
+[LEARN:lit-anchor] **CoVe 验证 fact-of-existence 强,但 numeric range claims 必须回 PDF 看 Fig/Table 自己确认**。Stöhr 2016 案例:CoVe 第一遍说 LV twist normal ~7-8° ± 3°(跨人群均值),但 PDF Fig 1C 显示 resting healthy peak twist ~15°(单人 peak,不是均值)。两者都对,但语义完全不同。Why: 数字论证(default 12° vs 15°)依赖于这个区分。How to apply: 任何 numeric anchor 进 spec / paper 之前,**必须看一次原 PDF 的 Fig/Table**,不依赖纯 CoVe(CoVe 只验"这篇文献存在 + DOI 对",不验 Claude 的语义解读)。
+
+[LEARN:tooling] **LEAP install 失败,fallback tomosipo + ASTRA 工作**。LEAP 没 PyPI wheel,readthedocs 文档失效,源码 build 需要 CUDA dev tools。tomosipo (MIT) + ASTRA (GPL,只动态链接 wheel,不影响 paper 代码 license) 在 RTX 6000 Ada (CC 8.9, CUDA 12.8) 上 smoke test 通过。Why: motion synth 的 cone-beam 投影 + Parker FBP 都需要 differentiable / non-equispaced angle 的 backend。How to apply: spec §架构 forward projection 的 ASSUMED → CLEAR (tomosipo+ASTRA);LEAP 留作 "considered alternative" 在论文 method 里一句话提一下。
+
+[LEARN:debug] **HU calibration scale 异常 ∝ 1/n_views,是 FDK normalization,不是 bug**。motion-day6 demo v3 看到 scale=0.0185 @ 1000 views,v5 看到 0.0370 @ 500 views,严格线性。Why: FDK 的 backprojection 把所有 view 的 contribution 累加,所以重建强度自然 scale with N_views。How to apply: synth pipeline 的 calibration step (V_clean 也走一次 forward+FBP no motion 当 baseline) 自动处理;不需要 special case。
+
+[LEARN:totalsegmentator] TotalSegmentator API 两个 trap:(1) 新版(>=2.x) `total` task 把心脏合并成 `heart` 单 ROI;chamber-level 需要 `task="heartchambers_highres"`。(2) `ml=True` 时 `output` 参数当**文件路径**(`.nii.gz` 后缀);`ml=False` 时当**目录路径**。两种模式 API 不一致。How to apply: motion-day6 demo 已 patch 这两点;未来 update 版本时 watch 这俩 trap。
+
+[LEARN:resource] **GPU contention 是真实约束**。`mcastro` 的 nnUNet 占了 39 GB / 48 GB(放假前留的,无人值守),只剩 2.8 GB,无法启动任何 training。LTSI session 2026-05-01 整个 windows 全 CPU smoke,等 GPU 释放。Why: A6000 是 shared resource,不是 dedicated。How to apply: spec timeline 不能假设 GPU always available;Week 5/6 训 VAE / LDM 时给 1-2 周 buffer 应对 contention;CPU smoke skeleton 已准备好,GPU 一释放 flip flag 即可启动真训练。
+
+## 架构具体落点(LTSI 2026-05-01 实现)
+
+[LEARN:arch] **Latent shape 实际是 192³ → 24³ × 4ch**(8x spatial compression),不是 spec v1.1 说的 256³ → 32×32×16。差别:(a) volume crop 到 192³ 围绕 heart bbox,不是全 256³;(b) latent 8x per-axis compression 是 MONAI default;(c) 4 channel 不是 16。Why: 192³ 是 heart bbox + 30mm pad 的实际大小;4ch latent 在 MONAI AutoencoderKL default,够用且参数少。How to apply: spec §计算预算 & 架构 update;Success Criteria 数字 target 不变(VAE 重建 RMSE 等指标在 192³ 上同样适用)。
+
+[LEARN:framework] **EDM (Karras 2022) over DDPM**。从 HM-EDM `conditional_EDM_3D.py` ported,移除 lucidrains UNet 依赖,wrap MONAI `DiffusionModelUNet`。50-step Heun sampling 比 DDPM 1000-step 快 30 倍 → N=16 posterior 采样可行。Why: spec v1.1 没显式 lock framework choice;LTSI 实际选 EDM 是合理的(precedent + speed)。How to apply: spec §三个 Novelty 主张 #1 措辞精化加 "EDM-based",论文方法节明确写 EDM motivation。

@@ -1,15 +1,21 @@
 # Requirements Specification — Cardiac CT Motion-Artifact Correction (Master Spec)
 
-**Date:** 2026-04-29(原始)/ 2026-04-30(v1.1 升级)
-**Status:** APPROVED v1.1 (2026-04-30,CMZ 批准)
+**Date:** 2026-04-29(原始)/ 2026-04-30(v1.1)/ 2026-05-02(v1.2)
+**Status:** APPROVED v1.2 (2026-05-02,基于 LTSI 2026-05-01 session 实施反馈)
 **Revision history:**
-- v0.1 (2026-04-29): Initial spec from interview
-- v0.2 (2026-04-29): TAVI to MAY-deferred / TT U-Net architecture clarification / reader study deferred to rebuttal / venue page-flexible
-- v0.3 (2026-04-29): "为什么单相位" 专节加入 IN scope,基于 TT U-Net §III-B 全文 ground truth + Risk Register 加 reviewer 应对
-- v0.4 (2026-04-29): 重写"为什么单相位"专节,诚实承认多相位四条优势,把研究论证升级为可验证科学 hypothesis(diffusion prior 能否补偿 temporal redundancy)
-- v0.5 (2026-04-29): 加"伪影来源 framing"专节(PAD 是 physics-based synthesis)+ "真实测试数据 4-tier 策略"专节
+- v0.1 - v1.1: 见前(早期 framing iteration + clinical entanglement prune)
 - **v1.0 (2026-04-29): 用户批准**(MICCAI / TMI hybrid 路线)
-- **v1.1 (2026-04-30): MICCAI / CVPR / AAAI 多 venue cascade + clinical entanglement 完全 prune**。用户决策:不和临床扯关系(避免和医生协调浪费时间),公开数据 only,demo 程度后再讨论导师。三档 venue cascade 形成自然 timeline。下列章节大改:venue 状态 / 下游评估 prune / reader study 完全删除 / Operational AI 缩到 1 项 / 真实测试数据 4-tier → 2-tier。新加 §Venue strategy / §Reproducibility commitments / §Baseline comparison plan / §Framing dual-track。撤回 v0.5 推过的 clinical decision support 升级(MICCAI / CVPR / AAAI 都不需要)。
+- **v1.1 (2026-04-30): MICCAI / CVPR / AAAI 多 venue cascade + clinical entanglement 完全 prune**
+- **v1.2 (2026-05-02): LTSI 2026-05-01 session 实施反馈整合**。具体:
+  - **Motion synth path 锁定为 parametric DVF (Lossau-lineage)**,**不是 PAD reproduction** — TT U-Net 4D-SSM 训练码 NOT released(只 5 个 demo 文件),即使付 $1000 XCAT license 也无法完整复现 PAD。这从 fallback 升为主路径,framing positive("license-free parametric alternative",not "fallback")
+  - **Operational AI #1 (XCAT license ask) RESCINDED** — 任何 path 都不需要 XCAT
+  - **Lossau 2019 (CoMoFACT) 取代 PAD 成为最近 antecedent** — 论文 related-work main reference 重定位
+  - **Forward projection: tomosipo + ASTRA**(LEAP 安装失败)— ASSUMED → CLEAR
+  - **Latent shape 实际 192³ → 24³ × 4ch**(不是 256³ → 32×32×16)— heart-bbox crop + MONAI default 8x spatial compression
+  - **Diffusion framework: EDM (Karras 2022)** explicit lock — 从 HM-EDM port,50-step Heun sampling
+  - **GPU contention** 加入 Risk Register(`mcastro` nnUNet 39 GB 占用)
+  - 加引用:Lossau2019_CoMoFACT, Lossau2019_CoMPACT, Hahn2017_PAMoCo, Maier2021_DeepPAMoCo, Maier2025_DeepCBCT, Sengupta2008_TwistMechanics, Stohr2016_TwistMechanicsReview, Yao2023_PhaseDeviation, Ren2022_GAN(已在 lit_review_parametric-cardiac-CT-motion-simulation.md 完成 CoVe)
+  - Sub-spec: `2026-04-30_motion-synthesis-pipeline.md` v1.0 已 APPROVED + IMPLEMENTING(Stage 1 完成,等 GPU 跑 v6 apples-to-apples)
 **Source documents:**
 - V1 (landscape底盘): [`../decisions/2026-04-29_research-direction-v1.md`](../decisions/2026-04-29_research-direction-v1.md) → [`v1.pdf`](../decisions/2026-04-29_research-direction-v1.pdf)
 - V2 (focus层): [`../decisions/2026-04-29_research-direction-v2.md`](../decisions/2026-04-29_research-direction-v2.md) → [`v2.html`](../decisions/2026-04-29_research-direction-v2.html)
@@ -158,7 +164,7 @@ TT U-Net §I + §II-A + §V(ablation)表明,多相位有四条**真实**优势:
 
 #### 数据
 - [ ] **ImageCAS 自然带伪影子集筛选 pipeline**(基于 HR / arrhythmia label / FOR-LIRS-MAS auto-score),Week 5-6 同步开发;预期产出 30-100 例 real-motion test set
-- [ ] **PAD pipeline 单相位简化版**:从 ImageCAS 干净 → 单相位 corrupted 合成,physics-based(从 TT U-Net repo 改),不做多相位扩展
+- [ ] **Parametric DVF motion synth pipeline**(Lossau-lineage,non-PAD):从 ImageCAS 干净 → tomosipo+ASTRA cone-beam + Parker FBP → 单相位 corrupted。**License-free**(不需要 XCAT);4-component 参数化 DVF(contraction + twist + long-axis + translation)。Sub-spec: [`2026-04-30_motion-synthesis-pipeline.md`](2026-04-30_motion-synthesis-pipeline.md) v1.0 IMPLEMENTING
 - [ ] **ImageCAS 1000 例**作为主训练数据
 - [ ] **训/验/测 split** 锁定一次,文件提交到 `data/imagecas/splits/`,**禁止后期改 split**
 - [ ] 每个训练 run 有对应 run-card(per [`.claude/rules/experiments-protocol.md`](../../.claude/rules/experiments-protocol.md))
@@ -236,7 +242,9 @@ SHOULD(加分):
 | 项 | 决策 |
 | --- | --- |
 | GPU | 单卡 A6000 48 GB |
-| 起点架构 | **3D 256³ latent**(VAE 压缩到 32×32×16);若 VAE 保真度失败,fallback 到 **2D-axial 256² + z-TV cross-slice consistency**(DiffusionMBIR 风格)|
+| 起点架构 | **3D latent diffusion via EDM (Karras 2022)** — 192³ heart-bbox crop → 24³ × 4ch latent(8x spatial compression via MONAI AutoencoderKL);conditional UNet via channel-concat (z_t ⨁ z_cond,8 ch in / 4 ch out);Heun 50-step sampler;若 VAE 保真度失败,fallback 到 **2D-axial 256² + z-TV cross-slice consistency**(DiffusionMBIR 风格)|
+| Forward projection | **tomosipo + ASTRA**(LEAP 安装失败 → fallback,2026-05-01 锁定)|
+| 心脏分割 | **TotalSegmentator** `total` task 单 ROI(`heart`)+ bbox crop |
 | Patch 策略 | 训练:全 latent 体积 batch=2–4;推断:`SlidingWindowInferer` 全 256³ 体素 |
 | 精度 | FP16 + AMP;VAE 训练用 FP32 sanity baseline 一次 |
 | Seeds | 单一 `set_determinism()` per script,记录在 run card |
@@ -275,8 +283,13 @@ SHOULD(加分):
 | Reader study | **OUT-OF-SCOPE** | v1.1 完全删除;MICCAI/CVPR/AAAI 都不必需;TT U-Net 在 TMI 也无 |
 | 临床 outcome metrics(FFR/TAVI/CAD-RADS reader)| **OUT-OF-SCOPE** | v1.1 完全删除;走纯方法学路线 |
 | Vendor 算法比较 | **OUT-OF-SCOPE** | 闭源无法对比 |
-| XCAT phantom license | **BLOCKED-low** | 仅 PAD-Pro(MAY)需要,async 问 Pascal,Week 6 之前 |
-| PAD 改进深度 | **ASSUMED** | 6 月底基于 baseline plateau 决定;原版起步 |
+| XCAT phantom license | **N/A (v1.2 RESCINDED)** | TT U-Net 4D-SSM 训练码未 release;parametric DVF 是 license-free 主路径,XCAT 任何 path 都不需要 |
+| Motion synth pipeline | **CLEAR (v1.2)** | Parametric DVF (Lossau-lineage),sub-spec `2026-04-30_motion-synthesis-pipeline.md` v1.0 IMPLEMENTING;tomosipo+ASTRA backend |
+| PAD 改进深度 | **N/A (v1.2)** | PAD path 整体撤回,改 parametric DVF improvements(已在 sub-spec 内规划) |
+| Forward projection backend | **CLEAR (v1.2)** | tomosipo + ASTRA(LEAP 安装失败 fallback,smoke 通过) |
+| Diffusion framework | **CLEAR (v1.2)** | EDM (Karras 2022),从 HM-EDM port,50-step Heun sampler,无 lucidrains 依赖 |
+| Latent shape | **CLEAR (v1.2)** | 192³ heart-bbox crop → 24³ × 4ch(MONAI default 8x spatial)|
+| GPU 可用性 | **WAITING** | `mcastro` nnUNet 占 39/48 GB;无 ETA;CPU smoke ready |
 | Venue 选择 | **CLEAR (cascade)** | CVPR 2027 第 1 档 → MICCAI 2027 第 2 档 → AAAI 2028 第 3 档;7 月 demo 后导师讨论调 emphasis |
 | arXiv 占坑节奏 | **CLEAR** | 11 月与 CVPR 投递同步挂 |
 | UQ N-sample 数量 | **ASSUMED** | N=8–16 起步;Week 9-12 实验决定 |
@@ -331,22 +344,28 @@ SHOULD(加分):
 | Sim-to-real 泛化差 | 中(领域共同问题)| 这是领域共同限制;未来工作扩 |
 | **CVPR reviewer 觉得 "incremental application"** | **中-高(v1.1 新增)** | (a) 强调 hypothesis-driven framing(diffusion vs temporal redundancy 是 testable scientific question);(b) BIPSDA-style UQ 在医学 inverse problem 上是首次;(c) MICCAI/AAAI fallback 接住 |
 | **没有 clinical impact 论证 → reviewer 觉得论文 "academic exercise"** | **低(v1.1 新增)** | 三档 venue 都不要求 clinical RCT;methodological + offline metrics + reproducibility 足够;ImageCAS GT 上 Dice 直接对应 stenosis 评估精度,有 implicit 临床相关性 |
+| **GPU contention(LTSI A6000 shared resource)** | **中(v1.2 新增)** | `mcastro` nnUNet 39 GB / 48 GB 占用是当前真实状态(2026-05-01 LTSI session);CPU smoke skeleton 已 ready,GPU 一释放 flip flag 即可启动真训练。Timeline 给 1-2 周 buffer |
+| **PAD reproduction 不可能(TT U-Net 4D-SSM 训练码未 release)** | **已规避(v1.2)** | Pivot 到 parametric DVF (Lossau-lineage),license-free,sub-spec 2026-04-30 IMPLEMENTING 中 |
+| **Reviewer 问 "why not use Lossau CoMoFACT directly"** | **中(v1.2 新增)** | Patch-level (CoMoFACT) → whole-volume (ours);2D motion vector classifier (CoMoFACT) → 4-component DVF + paired LDM training。Methodology 与 scope 都不同。Lit review 已准备 reviewer 应对话术(`lit_review_parametric-cardiac-CT-motion-simulation.md`)|
 
 ---
 
-## Operational Action Items(v1.1 简化到 1 项)
+## Operational Action Items(v1.2:全部 RESCINDED)
 
-仅 1 项,async 低优先级,不阻塞任何代码工作:
+**当前 0 项 active operational AI**。所有 v1.0/v1.1 的 ask 都已 RESCINDED 或 deferred:
 
-- [ ] **#1 — 问 Pascal/Carlos**:LTSI 是否已经有 XCAT phantom license(若无,联系 Duke Segars 组要 academic license,~6-8 周)— 仅 PAD-Pro 改进(MAY)需要。**Week 6 之前问就行**。
+**v1.2 RESCIND**:
+- ~~#1 XCAT phantom license ask~~ → **不需要任何 path** — Lit review 2026-05-01 确认 TT U-Net 4D-SSM 训练码 NOT released,即使付 $1000 也无法完整复现 PAD;parametric DVF 是 license-free 主路径(不是 fallback)
 
-**已撤回的 operational items**(v1.1):
-- ~~#2 LTSI / CHU Rennes PACS retrospective pull~~ → 不需要(临床数据 OUT-OF-SCOPE)
-- ~~#3 给 Deng 实验室发邮件求合作~~ → 不需要(数据自给自足)
+**v1.1 已撤回(保留 audit)**:
+- ~~LTSI / CHU Rennes PACS retrospective pull~~ → 不需要(临床数据 OUT-OF-SCOPE)
+- ~~给 Deng 实验室发邮件求合作~~ → 不需要(数据自给自足)
 - ~~Pascal/Carlos 询问 reader study 医生~~ → 不需要(reader study OUT-OF-SCOPE)
 - ~~TRUST detector zero-shot self-check~~ → TAVI MAY-DEFERRED
 
 **导师讨论时机**(7-8 月 demo presentable 后)— 不算 operational AI(不需要现在做),记录在 §Venue Strategy。
+
+**唯一 active wait**:GPU contention 释放(`mcastro` nnUNet 当前占 39 GB / 48 GB)— 这不是 operational ask(没人需要做事),是 environmental wait。CPU smoke skeleton 已 ready,GPU 一释放 flip 即跑。
 
 ---
 
@@ -406,6 +425,7 @@ SHOULD(加分):
 
 - [x] **CMZ 批准 v1.0:2026-04-29**
 - [x] **CMZ 批准 v1.1:2026-04-30**(MICCAI / CVPR / AAAI cascade + clinical entanglement prune)
-- [ ] 后续 ASSUMED 解锁触发后(Week 5 阈值 review / Week 5-8 conditioning + lumen loss / Week 9-12 N-sample / Week 17+ PAD-Pro),本 spec 升级到 v1.2 / v1.3
+- [x] **v1.2:2026-05-02**(LTSI 2026-05-01 session 实施反馈整合;Mac 端被动 update,不需要重新 user approval — 都是 implementation reality 反映,non-controversial)
+- [ ] 后续 ASSUMED 解锁触发后(Week 5 阈值 review / Week 5-8 conditioning + lumen loss / Week 9-12 N-sample / Week 17+ PAD improvements),本 spec 升级到 v1.3 / v1.4
 
 修订机制:**spec 不直接编辑覆盖**,需重大修订时新增 v1.2 / v1.3 版本并记录变更原因。
