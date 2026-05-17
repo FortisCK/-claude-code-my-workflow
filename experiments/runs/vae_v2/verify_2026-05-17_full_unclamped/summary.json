@@ -1,0 +1,89 @@
+{
+  "amp": true,
+  "by_split": {
+    "test": {
+      "dice_lumen_stub_mean": 0.735538477940569,
+      "dice_lumen_stub_std": 0.29334399204463274,
+      "heart_mae_hu_mean": 31.147959685418755,
+      "heart_mae_hu_std": 5.717942902983222,
+      "heart_mae_norm_mean": 0.015212678723037243,
+      "heart_mae_norm_std": 0.0027926461064631124,
+      "kl_mean": 221178.34921875,
+      "kl_std": 22912.268678849206,
+      "mae_hu_mean": 22.91336202324601,
+      "mae_hu_std": 3.8357554350283416,
+      "mae_norm_mean": 0.011190897203050554,
+      "mae_norm_std": 0.0018733848278526697,
+      "n_cases": 100.0,
+      "nrmse_mean": 0.012774880705401302,
+      "nrmse_std": 0.0023873046749362595,
+      "psnr_mean": 39.7535860824585,
+      "psnr_std": 0.9631174446618465,
+      "ssim_mean": 0.9586448925733566,
+      "ssim_std": 0.009177126082506587
+    },
+    "val": {
+      "dice_lumen_stub_mean": 0.7348887228121659,
+      "dice_lumen_stub_std": 0.302175801155141,
+      "heart_mae_hu_mean": 30.80750924271997,
+      "heart_mae_hu_std": 5.896505216568079,
+      "heart_mae_norm_mean": 0.015046402560546995,
+      "heart_mae_norm_std": 0.0028798560276278775,
+      "kl_mean": 223449.3415625,
+      "kl_std": 22614.972290147532,
+      "mae_hu_mean": 23.297237006085926,
+      "mae_hu_std": 4.158180225510723,
+      "mae_norm_mean": 0.011378381932154298,
+      "mae_norm_std": 0.00203085725299669,
+      "n_cases": 100.0,
+      "nrmse_mean": 0.01296702679246664,
+      "nrmse_std": 0.002361724590996747,
+      "psnr_mean": 39.7494775390625,
+      "psnr_std": 1.0316596654960317,
+      "ssim_mean": 0.9576908284425736,
+      "ssim_std": 0.010689034001572983
+    }
+  },
+  "checkpoint": "experiments/checkpoints/vae_v2/best_val.pt",
+  "checkpoint_info": {
+    "checkpoint_epoch": 445,
+    "checkpoint_val_metrics": {
+      "val/kl": 223449.34234375,
+      "val/p": 0.057034912109375,
+      "val/recon": 0.011378614380955696
+    },
+    "checkpoint_val_recon": 0.011378614380955696,
+    "model_cfg": {
+      "attention_levels": [
+        false,
+        false,
+        false
+      ],
+      "channels": [
+        64,
+        128,
+        256
+      ],
+      "in_channels": 1,
+      "latent_channels": 4,
+      "norm_num_groups": 32,
+      "num_res_blocks": [
+        2,
+        2,
+        2
+      ],
+      "out_channels": 1,
+      "use_checkpoint": true
+    }
+  },
+  "clamp": false,
+  "config": "code/training/configs/vae_v2_128.yaml",
+  "n_cases": 200,
+  "processed_dir": "/home/mingzhang/cardiac-artifacts/data/imagecas/processed/v1",
+  "roi_size": [
+    128,
+    128,
+    128
+  ],
+  "split_file": "data/imagecas/splits/v1.json"
+}

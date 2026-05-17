@@ -104,6 +104,7 @@ wandb/
 # Smoke / generated run artifacts (regenerable; force-add real-run records)
 experiments/runs/eval_v1/
 experiments/runs/*/smoke/
+experiments/runs/*/verify_*/figures/
 
 # Exploration outputs (NIfTI corrupted volumes are ~225 MB each;
 # segmentation workdirs are also large)

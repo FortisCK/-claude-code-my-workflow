@@ -1,0 +1,67 @@
+{
+  "amp": true,
+  "by_split": {
+    "manual": {
+      "dice_lumen_stub_mean": 0.898295521736145,
+      "dice_lumen_stub_std": 0.07598646325498387,
+      "heart_mae_hu_mean": 45.40223966119811,
+      "heart_mae_hu_std": 4.151245720054752,
+      "heart_mae_norm_mean": 0.02217447602500518,
+      "heart_mae_norm_std": 0.002027470437145178,
+      "kl_mean": 236730.32552083334,
+      "kl_std": 8367.419730293504,
+      "mae_hu_mean": 31.929772360017523,
+      "mae_hu_std": 2.8054708325502205,
+      "mae_norm_mean": 0.015594516415148973,
+      "mae_norm_std": 0.0013701933248108523,
+      "n_cases": 6.0,
+      "nrmse_mean": 0.015753152625014383,
+      "nrmse_std": 0.0031459290455975912,
+      "psnr_mean": 37.414180755615234,
+      "psnr_std": 0.3708819676022429,
+      "ssim_mean": 0.9299788574377695,
+      "ssim_std": 0.009505077028539479
+    }
+  },
+  "checkpoint": "experiments/checkpoints/vae_v2/best_val.pt",
+  "checkpoint_info": {
+    "checkpoint_epoch": 445,
+    "checkpoint_val_metrics": {
+      "val/kl": 223449.34234375,
+      "val/p": 0.057034912109375,
+      "val/recon": 0.011378614380955696
+    },
+    "checkpoint_val_recon": 0.011378614380955696,
+    "model_cfg": {
+      "attention_levels": [
+        false,
+        false,
+        false
+      ],
+      "channels": [
+        64,
+        128,
+        256
+      ],
+      "in_channels": 1,
+      "latent_channels": 4,
+      "norm_num_groups": 32,
+      "num_res_blocks": [
+        2,
+        2,
+        2
+      ],
+      "out_channels": 1,
+      "use_checkpoint": true
+    }
+  },
+  "config": "code/training/configs/vae_v2_128.yaml",
+  "n_cases": 6,
+  "processed_dir": "/home/mingzhang/cardiac-artifacts/data/imagecas/processed/v1",
+  "roi_size": [
+    128,
+    128,
+    128
+  ],
+  "split_file": "data/imagecas/splits/v1.json"
+}
