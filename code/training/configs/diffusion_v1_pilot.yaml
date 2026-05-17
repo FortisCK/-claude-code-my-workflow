@@ -1,0 +1,76 @@
+# diffusion_v1_pilot.yaml — short Stage-2 conditional EDM pilot.
+#
+# Mirrors diffusion_v1.yaml but uses a separate slug/checkpoint directory and
+# short 5-epoch schedule for training-dynamics validation before the full run.
+
+run:
+  slug: "diffusion_v1_pilot"
+  seed: 42
+  device: "cuda"
+
+vae:
+  checkpoint: "experiments/checkpoints/vae_v2/best_val.pt"
+  config: "code/training/configs/vae_v2_128.yaml"
+  smoke_checkpoint: "experiments/checkpoints/vae_v2/best_val.pt"
+
+data:
+  processed_dir: null
+  case_ids_train: null
+  case_ids_val: null
+  split_file: "data/imagecas/splits/v1.json"
+  val_split: 0.05
+  pair_mode: "precomputed"
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+augmentation:
+  p_flip: 0.5
+  rotate_range_deg: 5.0
+  shift_range_voxels: 2
+
+denoiser:
+  latent_channels: 4
+  channels: [64, 128, 256, 256]
+  num_res_blocks: [2, 2, 2, 2]
+  attention_levels: [false, false, true, true]
+  num_head_channels: [0, 0, 64, 64]
+  norm_num_groups: 32
+
+edm:
+  sigma_min: 0.002
+  sigma_max: 80.0
+  sigma_data: 0.693282
+  rho: 7.0
+  P_mean: -1.2
+  P_std: 1.2
+  S_churn: 80.0
+  S_tmin: 0.05
+  S_tmax: 50.0
+  S_noise: 1.003
+  clip_pred: false
+  clip_value: 3.0
+  num_sample_steps_eval: 50
+
+ema:
+  enabled: true
+  decay: 0.999
+
+optim:
+  lr: 1.0e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+
+train:
+  batch_size: 4
+  patch_size: [128, 128, 128]
+  n_epochs: 5
+  grad_accum_steps: 1
+  amp: true
+  log_every_steps: 25
+  ckpt_every_epochs: 1
+  ckpt_dir: "experiments/checkpoints/diffusion_v1_pilot"
+
+wandb:
+  project: "cardiac-diffusion"
+  enabled: false

@@ -489,6 +489,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         if ema_denoiser is not None and ck.get("ema_denoiser") is not None:
             ema_denoiser.load_state_dict(ck["ema_denoiser"])
         log.info("[resume] loaded %s @ epoch %d", args.ckpt, ck.get("epoch", -1))
+        start_epoch = int(ck.get("epoch", 0)) + 1
+    else:
+        start_epoch = 1
 
     scaler: Optional[torch.amp.GradScaler] = None
     if cfg.train.amp and device.type == "cuda":
@@ -509,7 +512,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     # ---- Train ----
     ckpt_dir = Path(cfg.train.ckpt_dir)
     t0 = time.time()
-    for epoch in range(1, cfg.train.n_epochs + 1):
+    last_epoch = start_epoch - 1
+    for epoch in range(start_epoch, cfg.train.n_epochs + 1):
+        last_epoch = epoch
         train_metrics = run_epoch(
             epoch, engine, vae, loader, optimizer, cfg, device, scaler,
             ema_denoiser=ema_denoiser, smoke=smoke, engine_name=args.engine,
@@ -532,7 +537,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         log.info("[smoke] checkpoint at %s", out)
 
-    log.info("DONE in %.1fs", time.time() - t0)
+    log.info("DONE in %.1fs (last_epoch=%d)", time.time() - t0, last_epoch)
     if wandb_run is not None:
         wandb_run.finish()
     return 0
