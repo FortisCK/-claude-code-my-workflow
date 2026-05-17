@@ -137,6 +137,7 @@ def load_frozen_vae(vae_cfg_path: Path, ckpt_path: Path, device: torch.device) -
         attention_levels=tuple(m["attention_levels"]),
         latent_channels=m["latent_channels"],
         norm_num_groups=m["norm_num_groups"],
+        use_checkpoint=bool(m.get("use_checkpoint", False)),
     ).to(device)
     vae.load_state_dict(state["model"])
     vae.eval()
@@ -218,10 +219,14 @@ def build_paired_dataloader(
         train_ids = pool[:target_len]
 
     aug = cfg.augmentation
+    patch_size = None
+    if "patch_size" in cfg.train and cfg.train.patch_size is not None:
+        patch_size = tuple(int(v) for v in cfg.train.patch_size)
     transform = diffusion_train_transforms(
         p_flip=aug.p_flip,
         rotate_range_deg=aug.rotate_range_deg,
         shift_range_voxels=aug.shift_range_voxels,
+        patch_size=patch_size,
     )
 
     ds = ImageCASPairedDataset(

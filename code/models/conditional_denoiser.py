@@ -6,9 +6,10 @@ noisy clean latent (z_t) with the corrupted-conditioning latent (z_cond)
 along the channel axis. Output channels equal `latent_channels` (predicting
 the denoised z_clean).
 
-The forward signature matches the EDM wrapper's expectation:
+The forward signature matches the EDM wrapper's expectation. With the current
+VAE-v2 128³ paired-patch training path this is typically:
 
-    forward(x: (B, 2*latent_ch, 24,24,24), timesteps: (B,)) → (B, latent_ch, 24,24,24)
+    forward(x: (B, 2*latent_ch, 32,32,32), timesteps: (B,)) → (B, latent_ch, 32,32,32)
 
 EDM wraps this and feeds it `c_in(σ) * z_input` and `c_noise(σ)` per Karras 2022.
 
@@ -24,7 +25,7 @@ from __future__ import annotations
 import torch
 from monai.networks.nets import DiffusionModelUNet
 
-# ---- Latent-space defaults (24³ × 4 from CardiacVAE) -----------------------
+# ---- Latent-space defaults (32³ × 4 from VAE-v2 128³ patches) --------------
 DEFAULT_CHANNELS: tuple[int, ...] = (64, 128, 256, 256)
 DEFAULT_NUM_RES_BLOCKS: tuple[int, ...] = (2, 2, 2, 2)
 DEFAULT_ATTENTION_LEVELS: tuple[bool, ...] = (False, False, True, True)

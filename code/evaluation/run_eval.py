@@ -9,8 +9,8 @@ For each test case:
 
 Usage:
     python -m code.evaluation.run_eval \\
-        --vae-config code/training/configs/vae_v1.yaml \\
-        --vae-ckpt experiments/checkpoints/vae_v1/epoch_100.pt \\
+        --vae-config code/training/configs/vae_v2_128.yaml \\
+        --vae-ckpt experiments/checkpoints/vae_v2/best_val.pt \\
         --diff-config code/training/configs/diffusion_v1.yaml \\
         --diff-ckpt experiments/checkpoints/diffusion_v1/epoch_200.pt \\
         --case-ids 1 2 3 \\
@@ -31,18 +31,22 @@ from __future__ import annotations
 import argparse
 import csv
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import Optional
+
+os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
+os.environ.setdefault("XDG_CACHE_HOME", "/tmp")
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np
 import torch
 from monai.utils import set_determinism
 from omegaconf import OmegaConf
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
 
 from code.data import paths as path_registry  # noqa: E402
 from code.evaluation.metrics import all_metrics  # noqa: E402
@@ -65,6 +69,7 @@ def load_frozen_edm(
 ) -> tuple[EDM, dict]:
     cfg = OmegaConf.load(diff_cfg_path)
     state = torch.load(ckpt_path, map_location=device)
+    engine_cfg = state.get("engine_cfg") or cfg.edm
     if "denoiser_cfg" in state:
         d = state["denoiser_cfg"]
         log.info("[edm] using denoiser_cfg embedded in checkpoint")
@@ -93,18 +98,18 @@ def load_frozen_edm(
     edm = EDM(
         denoiser=denoiser,
         latent_channels=d["latent_channels"],
-        sigma_min=cfg.edm.sigma_min,
-        sigma_max=cfg.edm.sigma_max,
-        sigma_data=cfg.edm.sigma_data,
-        rho=cfg.edm.rho,
-        P_mean=cfg.edm.P_mean,
-        P_std=cfg.edm.P_std,
-        S_churn=cfg.edm.S_churn,
-        S_tmin=cfg.edm.S_tmin,
-        S_tmax=cfg.edm.S_tmax,
-        S_noise=cfg.edm.S_noise,
-        clip_pred=cfg.edm.clip_pred,
-        clip_value=cfg.edm.clip_value,
+        sigma_min=engine_cfg["sigma_min"],
+        sigma_max=engine_cfg["sigma_max"],
+        sigma_data=engine_cfg["sigma_data"],
+        rho=engine_cfg["rho"],
+        P_mean=engine_cfg["P_mean"],
+        P_std=engine_cfg["P_std"],
+        S_churn=engine_cfg["S_churn"],
+        S_tmin=engine_cfg["S_tmin"],
+        S_tmax=engine_cfg["S_tmax"],
+        S_noise=engine_cfg["S_noise"],
+        clip_pred=engine_cfg["clip_pred"],
+        clip_value=engine_cfg["clip_value"],
     ).to(device)
     edm.eval()
     return edm, OmegaConf.to_container(cfg, resolve=True)
@@ -193,6 +198,7 @@ def run_eval(
     pair_mode: str,
     n_samples: int,
     num_steps: int,
+    deterministic: bool,
     n_figs: int,
     device: torch.device,
 ) -> Path:
@@ -212,7 +218,7 @@ def run_eval(
             out = posterior_sample(
                 v_corr, vae, edm,
                 n_samples=n_samples, num_steps=num_steps,
-                deterministic=False, seed=42,
+                deterministic=deterministic, seed=42,
             )
             v_mean, v_std = out["mean"], out["std"]
 
@@ -248,9 +254,9 @@ def run_eval(
 
 def _build_argparser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Evaluate cardiac diffusion (Stage 2).")
-    p.add_argument("--vae-config", type=Path, default=Path("code/training/configs/vae_v1.yaml"))
+    p.add_argument("--vae-config", type=Path, default=Path("code/training/configs/vae_v2_128.yaml"))
     p.add_argument("--vae-ckpt", type=Path,
-                   default=Path("experiments/checkpoints/vae_v1/smoke/epoch_000.pt"))
+                   default=Path("experiments/checkpoints/vae_v2/best_val.pt"))
     p.add_argument("--diff-config", type=Path,
                    default=Path("code/training/configs/diffusion_v1.yaml"))
     p.add_argument("--diff-ckpt", type=Path,
@@ -264,6 +270,8 @@ def _build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--pair-mode", choices=["precomputed", "online_stub"], default=None)
     p.add_argument("--n-samples", type=int, default=16)
     p.add_argument("--num-steps", type=int, default=50)
+    p.add_argument("--deterministic", action="store_true",
+                   help="Set EDM S_churn=0 during sampling.")
     p.add_argument("--n-figs", type=int, default=5)
     p.add_argument("--out-dir", type=Path, default=Path("experiments/runs/eval_v1"))
     p.add_argument("--smoke", action="store_true",
@@ -314,6 +322,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         pair_mode=pair_mode,
         n_samples=args.n_samples,
         num_steps=args.num_steps,
+        deterministic=args.deterministic,
         n_figs=args.n_figs,
         device=device,
     ).exists()) - 1  # 0 if file written

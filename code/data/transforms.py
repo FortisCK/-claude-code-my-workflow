@@ -60,29 +60,45 @@ def diffusion_train_transforms(
     p_flip: float = 0.5,
     rotate_range_deg: float = 5.0,
     shift_range_voxels: int = 2,
+    patch_size: tuple[int, int, int] | None = None,
 ) -> Compose:
     """Augmentation pipeline for paired (clean, corrupted) diffusion training.
 
     Geometric augmentations apply to BOTH `volume` and `corrupted` so they
     remain aligned in physical space. No intensity jitter (avoid distribution
-    drift between train and inference).
+    drift between train and inference). When `patch_size` is set, both volumes
+    are cropped to the same fixed ROI, matching the frozen VAE's feasible
+    128³ operating window.
     """
     rotate_rad = rotate_range_deg * 3.141592653589793 / 180.0
-    return Compose(
-        [
-            RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=0),
-            RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=1),
-            RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=2),
-            RandAffined(
-                keys=["volume", "corrupted"],
-                prob=0.5,
-                rotate_range=(rotate_rad, rotate_rad, rotate_rad),
-                translate_range=(shift_range_voxels,) * 3,
-                padding_mode="border",
-            ),
-            EnsureTyped(keys=["volume", "corrupted"], dtype="float32", track_meta=False),
-        ]
+    transforms = [
+        RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=0),
+        RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=1),
+        RandFlipd(keys=["volume", "corrupted"], prob=p_flip, spatial_axis=2),
+        RandAffined(
+            keys=["volume", "corrupted"],
+            prob=0.5,
+            rotate_range=(rotate_rad, rotate_rad, rotate_rad),
+            translate_range=(shift_range_voxels,) * 3,
+            padding_mode="border",
+        ),
+    ]
+    if patch_size is not None:
+        transforms.extend(
+            [
+                SpatialPadd(keys=["volume", "corrupted"], spatial_size=patch_size),
+                RandSpatialCropd(
+                    keys=["volume", "corrupted"],
+                    roi_size=patch_size,
+                    random_size=False,
+                    random_center=True,
+                ),
+            ]
+        )
+    transforms.append(
+        EnsureTyped(keys=["volume", "corrupted"], dtype="float32", track_meta=False)
     )
+    return Compose(transforms)
 
 
 def vae_v2_train_transforms(

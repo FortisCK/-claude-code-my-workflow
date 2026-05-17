@@ -11,9 +11,9 @@ run:
   device: "cuda"
 
 vae:
-  checkpoint: "experiments/checkpoints/vae_v1/epoch_100.pt"   # filled in pre-launch (real run)
-  config: "code/training/configs/vae_v1.yaml"                 # for arch reconstruction
-  smoke_checkpoint: "experiments/checkpoints/vae_v1/smoke/epoch_000.pt"
+  checkpoint: "experiments/checkpoints/vae_v2/best_val.pt"
+  config: "code/training/configs/vae_v2_128.yaml"             # for arch reconstruction
+  smoke_checkpoint: "experiments/checkpoints/vae_v2/best_val.pt"
 
 data:
   processed_dir: null              # null → paths.get("IMAGECAS_PROCESSED")
@@ -42,7 +42,7 @@ denoiser:
 edm:
   sigma_min: 0.002
   sigma_max: 80.0
-  sigma_data: 0.5                  # re-tune from VAE-encoded train data after Stage 1
+  sigma_data: 0.693282             # z_clean std; train split, 128³ paired patches, 2026-05-17
   rho: 7.0
   P_mean: -1.2
   P_std: 1.2
@@ -65,6 +65,7 @@ optim:
 
 train:
   batch_size: 4
+  patch_size: [128, 128, 128]        # paired ROI; full 192³ VAE encode OOMs with v2
   n_epochs: 200
   grad_accum_steps: 1
   amp: true
