@@ -44,9 +44,9 @@ optim:
   weight_decay: 0.0
 
 train:
-  batch_size: 2                     # 192³ × 4 latent ch on 48 GB ≈ tight; tune
+  batch_size: 1                     # 192³ at 48 GB OOMed at bs=2 even after ghost cleared (PyTorch peak 45.6 GB > 47 GB capacity)
   n_epochs: 100
-  grad_accum_steps: 1
+  grad_accum_steps: 1               # grad accum NOT YET wired in train_vae.py — keep 1
   amp: true                         # torch.autocast fp16
   log_every_steps: 50
   val_every_epochs: 5

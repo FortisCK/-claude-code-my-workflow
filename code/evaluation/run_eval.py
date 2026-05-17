@@ -256,7 +256,11 @@ def _build_argparser() -> argparse.ArgumentParser:
     p.add_argument("--diff-ckpt", type=Path,
                    default=Path("experiments/checkpoints/diffusion_v1/smoke/epoch_000.pt"))
     p.add_argument("--processed-dir", type=Path, default=None)
-    p.add_argument("--case-ids", nargs="+", default=None)
+    p.add_argument("--case-ids", nargs="+", default=None,
+                   help="Explicit case ids. Overrides --split-file if both are given.")
+    p.add_argument("--split-file", type=Path,
+                   default=Path("data/imagecas/splits/v1.json"),
+                   help="JSON split file; the `test` field is used when --case-ids is None.")
     p.add_argument("--pair-mode", choices=["precomputed", "online_stub"], default=None)
     p.add_argument("--n-samples", type=int, default=16)
     p.add_argument("--num-steps", type=int, default=50)
@@ -285,10 +289,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     processed_dir = args.processed_dir or path_registry.get("IMAGECAS_PROCESSED")
     case_ids = args.case_ids or []
     if not case_ids:
-        # Default: use whatever clean cases are on disk (first 5).
-        case_ids = sorted(p.stem.removeprefix("case_")
-                          for p in processed_dir.glob("case_*.npz")
-                          if "__pair_" not in p.name)[:5]
+        # Prefer the canonical test split. Manuscript metrics MUST come from here.
+        if args.split_file and args.split_file.exists():
+            from code.data.splits import load_split
+            split = load_split(args.split_file)
+            case_ids = list(split.test)
+            log.info("[eval] using %d test ids from %s", len(case_ids), args.split_file)
+        else:
+            # Last-resort fallback: first 5 cases on disk (smoke / debugging).
+            case_ids = sorted(p.stem.removeprefix("case_")
+                              for p in processed_dir.glob("case_*.npz")
+                              if "__pair_" not in p.name)[:5]
+            log.warning("[eval] no split file — using first 5 cases on disk (debug only)")
     pair_mode = args.pair_mode or "precomputed"
 
     vae = load_frozen_vae(args.vae_config, args.vae_ckpt, device)

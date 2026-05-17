@@ -1,12 +1,13 @@
-# diffusion_v1.yaml — Stage-2 conditional EDM training config.
+# flow_v1.yaml — Stage-2 conditional Flow Matching / Stochastic Interpolants config.
 #
-# Trains ConditionalDenoiser on (z_clean, z_cond) latent pairs produced by a
-# frozen Stage-1 VAE.
+# Parallel to diffusion_v1.yaml but with the EDM block replaced by a `flow:` block.
+# Same ConditionalDenoiser backbone, same data + EMA + WandB plumbing — only the
+# generative engine changes. This pairs with `--engine flow`.
 #
-# Run-card slug placeholder: experiments/runs/<DATE>_diffusion_v1.md
+# Run-card slug placeholder: experiments/runs/<DATE>_flow_v1.md
 
 run:
-  slug: "diffusion_v1"
+  slug: "flow_v1"
   seed: 42
   device: "cuda"
 
@@ -39,20 +40,12 @@ denoiser:
   num_head_channels: [0, 0, 64, 64]
   norm_num_groups: 32
 
-edm:
-  sigma_min: 0.002
-  sigma_max: 80.0
-  sigma_data: 0.5                  # re-tune from VAE-encoded train data after Stage 1
-  rho: 7.0
-  P_mean: -1.2
-  P_std: 1.2
-  S_churn: 80.0
-  S_tmin: 0.05
-  S_tmax: 50.0
-  S_noise: 1.003
+flow:
+  schedule: "linear"               # "linear" = rectified flow; "trig" = VP-style
+  sde_noise_scale: 0.0             # 0 → deterministic ODE (canonical FM/RF)
   clip_pred: false
   clip_value: 3.0
-  num_sample_steps_eval: 50
+  num_sample_steps_eval: 8         # 4-8 is typical for `linear` schedule (Heun-2)
 
 ema:
   enabled: true
@@ -70,7 +63,7 @@ train:
   amp: true
   log_every_steps: 50
   ckpt_every_epochs: 10
-  ckpt_dir: "experiments/checkpoints/diffusion_v1"
+  ckpt_dir: "experiments/checkpoints/flow_v1"
 
 wandb:
   project: "cardiac-diffusion"

@@ -1,16 +1,33 @@
-"""train_diffusion.py — Stage-2 conditional EDM training (latent diffusion).
+"""train_diffusion.py — Stage-2 conditional latent generative training.
 
 The VAE is loaded frozen and encodes (V_clean, V_corrupted) to (z_clean, z_cond)
-on the fly; the EDM denoiser learns p(z_clean | z_cond) via concat conditioning.
+on the fly. A conditional denoiser learns p(z_clean | z_cond) via channel-concat
+conditioning. The engine is selected with `--engine`:
+
+    --engine edm    EDM (Karras 2022) — σ-weighted denoising MSE, Heun-2 sampler
+                    with S_churn. Reads `cfg.edm.*`. (default)
+    --engine flow   Stochastic Interpolants (Albergo et al. 2023) — velocity MSE,
+                    deterministic ODE sampler (linear ⇒ rectified flow). Reads
+                    `cfg.flow.*`.
+
+Both engines share the same `ConditionalDenoiser` backbone, the same data
+pipeline, the same EMA / checkpoint / WandB plumbing — so EDM vs FM is a clean
+A/B comparison for the manuscript ablation.
 
 Usage:
-    # Real training (GPU):
+    # Real training (GPU), EDM:
     python -m code.training.train_diffusion \\
         --config code/training/configs/diffusion_v1.yaml
+
+    # Real training (GPU), Flow Matching / Stochastic Interpolants:
+    python -m code.training.train_diffusion \\
+        --engine flow --config code/training/configs/flow_v1.yaml
 
     # CPU smoke (1 epoch × 4 batches, no AMP, no WandB, tiny denoiser):
     python -m code.training.train_diffusion \\
         --config code/training/configs/diffusion_v1.yaml --smoke
+    python -m code.training.train_diffusion \\
+        --engine flow --config code/training/configs/flow_v1.yaml --smoke
 
 Inputs:
     - VAE checkpoint (Stage-1)
@@ -52,12 +69,16 @@ if str(REPO_ROOT) not in sys.path:
 
 from code.data import paths as path_registry  # noqa: E402
 from code.data.imagecas_dataset import ImageCASPairedDataset  # noqa: E402
+from code.data.splits import load_split  # noqa: E402
 from code.data.transforms import diffusion_train_transforms  # noqa: E402
 from code.models.conditional_denoiser import ConditionalDenoiser  # noqa: E402
 from code.models.edm import EDM  # noqa: E402
+from code.models.stochastic_interpolant import StochasticInterpolant  # noqa: E402
 from code.models.vae import CardiacVAE  # noqa: E402
 
 log = logging.getLogger(__name__)
+
+ENGINES = ("edm", "flow")
 
 
 # ============================================================
@@ -159,7 +180,20 @@ def build_paired_dataloader(
         else path_registry.get("IMAGECAS_PROCESSED")
     )
 
-    if cfg.data.case_ids_train is None:
+    if cfg.data.case_ids_train is not None:
+        # Manual override (smoke / debugging / specific case lists)
+        train_ids = list(cfg.data.case_ids_train)
+        val_ids = list(cfg.data.case_ids_val) if cfg.data.case_ids_val else []
+    elif cfg.data.get("split_file"):
+        # Authoritative path: read fixed train/val/test from JSON. Test ids are
+        # NEVER used at training time.
+        split = load_split(Path(cfg.data.split_file))
+        train_ids = list(split.train)
+        val_ids = list(split.val)
+        log.info("[data] using split file %s (test=%d held out)",
+                 cfg.data.split_file, len(split.test))
+    else:
+        # Legacy fallback: dynamic val_split. Avoid for paper-cited runs.
         if cfg.data.pair_mode == "precomputed":
             ids = discover_paired_case_ids(proc_dir)
             if not ids:
@@ -170,10 +204,9 @@ def build_paired_dataloader(
                 )
         else:
             ids = discover_clean_case_ids(proc_dir)
+        log.warning("[data] split_file not set — falling back to dynamic val_split=%.2f",
+                    cfg.data.val_split)
         train_ids, val_ids = split_train_val(ids, cfg.data.val_split, cfg.run.seed)
-    else:
-        train_ids = list(cfg.data.case_ids_train)
-        val_ids = []
 
     if smoke:
         pool = (train_ids + val_ids) or list(cfg.data.case_ids_train or [])
@@ -231,7 +264,7 @@ def ema_update(ema: torch.nn.Module, model: torch.nn.Module, decay: float) -> No
 
 def run_epoch(
     epoch: int,
-    edm: EDM,
+    engine: torch.nn.Module,
     vae: CardiacVAE,
     loader: DataLoader,
     optimizer: torch.optim.Optimizer,
@@ -240,13 +273,15 @@ def run_epoch(
     scaler: Optional[torch.amp.GradScaler],
     ema_denoiser: Optional[torch.nn.Module],
     smoke: bool,
+    engine_name: str,
     wandb_run=None,
 ) -> dict[str, float]:
-    edm.train()
+    engine.train()
     vae.eval()
     n_batches = 0
     running = 0.0
     n_max = 4 if smoke else len(loader)
+    loss_key = f"loss/{engine_name}"
 
     for step, batch in enumerate(loader):
         if smoke and step >= n_max:
@@ -261,45 +296,94 @@ def run_epoch(
         optimizer.zero_grad(set_to_none=True)
         if scaler is not None and device.type == "cuda":
             with torch.autocast(device_type="cuda", dtype=torch.float16):
-                loss = edm.loss(z_clean, z_cond)
+                loss = engine.loss(z_clean, z_cond)
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            loss = edm.loss(z_clean, z_cond)
+            loss = engine.loss(z_clean, z_cond)
             loss.backward()
             optimizer.step()
 
         if ema_denoiser is not None and cfg.ema.enabled:
-            ema_update(ema_denoiser, edm.denoiser, decay=cfg.ema.decay)
+            ema_update(ema_denoiser, engine.denoiser, decay=cfg.ema.decay)
 
         running += float(loss.detach())
         n_batches += 1
 
         if step % cfg.train.log_every_steps == 0:
-            log.info("epoch %d step %d  edm_loss=%.4f", epoch, step, float(loss.detach()))
+            log.info("epoch %d step %d  %s=%.4f", epoch, step, engine_name, float(loss.detach()))
         if wandb_run is not None:
-            wandb_run.log({"loss/edm": float(loss.detach()), "epoch": epoch})
+            wandb_run.log({loss_key: float(loss.detach()), "epoch": epoch})
 
-    return {"loss/edm_mean": running / max(1, n_batches)}
+    return {f"{loss_key}_mean": running / max(1, n_batches)}
 
 
 def save_checkpoint(
-    edm: EDM, optim: torch.optim.Optimizer, ema_denoiser: Optional[torch.nn.Module],
-    epoch: int, ckpt_dir: Path, denoiser_cfg: Optional[DictConfig] = None,
+    engine: torch.nn.Module, optim: torch.optim.Optimizer,
+    ema_denoiser: Optional[torch.nn.Module],
+    epoch: int, ckpt_dir: Path,
+    denoiser_cfg: Optional[DictConfig] = None,
+    engine_name: Optional[str] = None,
+    engine_cfg: Optional[DictConfig] = None,
 ) -> Path:
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     out = ckpt_dir / f"epoch_{epoch:03d}.pt"
     payload: dict = {
         "epoch": epoch,
-        "denoiser": edm.denoiser.state_dict(),
+        "denoiser": engine.denoiser.state_dict(),
         "optim": optim.state_dict(),
         "ema_denoiser": ema_denoiser.state_dict() if ema_denoiser is not None else None,
     }
     if denoiser_cfg is not None:
         payload["denoiser_cfg"] = OmegaConf.to_container(denoiser_cfg, resolve=True)
+    if engine_name is not None:
+        payload["engine"] = engine_name
+    if engine_cfg is not None:
+        payload["engine_cfg"] = OmegaConf.to_container(engine_cfg, resolve=True)
     torch.save(payload, out)
     return out
+
+
+def build_engine(
+    cfg: DictConfig, denoiser: ConditionalDenoiser, engine_name: str,
+) -> tuple[torch.nn.Module, DictConfig]:
+    """Instantiate the EDM or Stochastic-Interpolant wrapper around `denoiser`.
+
+    Returns the engine and the engine-specific cfg sub-block (for checkpoint
+    embedding so loaders can reconstruct the wrapper without the YAML).
+    """
+    if engine_name == "edm":
+        ec = cfg.edm
+        engine: torch.nn.Module = EDM(
+            denoiser=denoiser,
+            latent_channels=cfg.denoiser.latent_channels,
+            sigma_min=ec.sigma_min,
+            sigma_max=ec.sigma_max,
+            sigma_data=ec.sigma_data,
+            rho=ec.rho,
+            P_mean=ec.P_mean,
+            P_std=ec.P_std,
+            S_churn=ec.S_churn,
+            S_tmin=ec.S_tmin,
+            S_tmax=ec.S_tmax,
+            S_noise=ec.S_noise,
+            clip_pred=ec.clip_pred,
+            clip_value=ec.clip_value,
+        )
+        return engine, ec
+    if engine_name == "flow":
+        fc = cfg.flow
+        engine = StochasticInterpolant(
+            denoiser=denoiser,
+            latent_channels=cfg.denoiser.latent_channels,
+            schedule=fc.schedule,
+            sde_noise_scale=fc.sde_noise_scale,
+            clip_pred=fc.clip_pred,
+            clip_value=fc.clip_value,
+        )
+        return engine, fc
+    raise ValueError(f"--engine must be one of {ENGINES}, got {engine_name!r}")
 
 
 # ============================================================
@@ -308,8 +392,13 @@ def save_checkpoint(
 
 
 def _build_argparser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Train cardiac conditional EDM (Stage 2).")
+    p = argparse.ArgumentParser(
+        description="Train cardiac conditional latent generator (Stage 2): EDM or Flow."
+    )
     p.add_argument("--config", type=Path, required=True)
+    p.add_argument("--engine", choices=ENGINES, default="edm",
+                   help="Generative engine: 'edm' (Karras 2022) or 'flow' "
+                        "(Stochastic Interpolants / rectified flow).")
     p.add_argument("--smoke", action="store_true",
                    help="CPU smoke: 1 epoch × 4 batches, tiny denoiser, no AMP, no WandB.")
     p.add_argument("--ckpt", type=Path, default=None, help="resume from checkpoint")
@@ -346,7 +435,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     else:
         device = torch.device(cfg.run.device if torch.cuda.is_available() else "cpu")
 
-    log.info("[setup] device=%s  slug=%s", device, cfg.run.slug)
+    log.info("[setup] engine=%s  device=%s  slug=%s", args.engine, device, cfg.run.slug)
 
     # ---- Frozen VAE ----
     vae_ckpt = Path(cfg.vae.smoke_checkpoint) if smoke and "smoke_checkpoint" in cfg.vae \
@@ -371,22 +460,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     n_params = sum(p.numel() for p in denoiser.parameters())
     log.info("[model] ConditionalDenoiser params=%.2fM", n_params / 1e6)
 
-    edm = EDM(
-        denoiser=denoiser,
-        latent_channels=cfg.denoiser.latent_channels,
-        sigma_min=cfg.edm.sigma_min,
-        sigma_max=cfg.edm.sigma_max,
-        sigma_data=cfg.edm.sigma_data,
-        rho=cfg.edm.rho,
-        P_mean=cfg.edm.P_mean,
-        P_std=cfg.edm.P_std,
-        S_churn=cfg.edm.S_churn,
-        S_tmin=cfg.edm.S_tmin,
-        S_tmax=cfg.edm.S_tmax,
-        S_noise=cfg.edm.S_noise,
-        clip_pred=cfg.edm.clip_pred,
-        clip_value=cfg.edm.clip_value,
-    ).to(device)
+    engine, engine_cfg = build_engine(cfg, denoiser, args.engine)
+    engine = engine.to(device)
+    log.info("[engine] %s", args.engine)
 
     optimizer = torch.optim.Adam(
         denoiser.parameters(),
@@ -430,18 +506,25 @@ def main(argv: Optional[list[str]] = None) -> int:
     t0 = time.time()
     for epoch in range(1, cfg.train.n_epochs + 1):
         train_metrics = run_epoch(
-            epoch, edm, vae, loader, optimizer, cfg, device, scaler,
-            ema_denoiser=ema_denoiser, smoke=smoke, wandb_run=wandb_run,
+            epoch, engine, vae, loader, optimizer, cfg, device, scaler,
+            ema_denoiser=ema_denoiser, smoke=smoke, engine_name=args.engine,
+            wandb_run=wandb_run,
         )
         log.info("[epoch %d] mean train: %s", epoch, train_metrics)
         if (not smoke) and (epoch % cfg.train.ckpt_every_epochs == 0):
-            out = save_checkpoint(edm, optimizer, ema_denoiser, epoch, ckpt_dir,
-                                   denoiser_cfg=cfg.denoiser)
+            out = save_checkpoint(
+                engine, optimizer, ema_denoiser, epoch, ckpt_dir,
+                denoiser_cfg=cfg.denoiser,
+                engine_name=args.engine, engine_cfg=engine_cfg,
+            )
             log.info("[ckpt] %s", out)
 
     if smoke:
-        out = save_checkpoint(edm, optimizer, ema_denoiser, epoch=0,
-                                ckpt_dir=ckpt_dir / "smoke", denoiser_cfg=cfg.denoiser)
+        out = save_checkpoint(
+            engine, optimizer, ema_denoiser, epoch=0,
+            ckpt_dir=ckpt_dir / "smoke", denoiser_cfg=cfg.denoiser,
+            engine_name=args.engine, engine_cfg=engine_cfg,
+        )
         log.info("[smoke] checkpoint at %s", out)
 
     log.info("DONE in %.1fs", time.time() - t0)

@@ -1,0 +1,99 @@
+# vae_v2.yaml — Stage-1 KL-VAE (cardiac CT) MAISI-aligned config.
+#
+# Differences from vae_v1.yaml (root cause: v1 plateau ≈ 70 HU L1):
+#   - Architecture: channels [32,64,128,128] → [64,128,256] (3 levels not 4)
+#   - Loss recipe: + perceptual (LPIPS-squeeze, fake_3d_ratio=0.2) + adversarial
+#                  (PatchGAN, INSTANCE norm); kl_weight 1e-6 → 1e-7;
+#                  drop SSIMLoss
+#   - Training: random 64³ patches (was whole 192³ — caused OOM at bs=2);
+#               dual optimiser G + D; lr_warmup 0.01/0.1/1.0 at <10/<20/else;
+#               GradScaler init_scale=2**8, growth_factor=1.5 (GAN-friendly).
+#   - Validation: SlidingWindowInferer + dynamic_infer (was: not implemented).
+#   - Split: reads data/imagecas/splits/v1.json (frozen 800/100/100) — was
+#            dynamic val_split=0.05.
+#
+# Reference: external/MAISI-v2/configs/config_maisi_vae_train.json &
+#            external/MAISI-v2/train_vae_tutorial.ipynb cells 24, 26, 30
+# (Apache-2.0 / NVIDIA-Medtech, cloned 2026-05-07).
+#
+# Run-card slug placeholder: experiments/runs/<DATE>_<HHMM>_vae-v2-pretrain.md
+
+run:
+  slug: "vae_v2"
+  seed: 42
+  device: "cuda"
+
+data:
+  processed_dir: null              # null → paths.get("IMAGECAS_PROCESSED")
+  split_file: "data/imagecas/splits/v1.json"  # frozen 800/100/100; see code/data/splits.py
+  case_ids_train: null             # explicit override; null → use split_file
+  case_ids_val: null
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+augmentation:
+  p_flip: 0.5
+  rotate_range_deg: 5.0
+  shift_range_voxels: 2
+  intensity_shift_offset: 0.05
+
+model:
+  in_channels: 1
+  out_channels: 1
+  channels: [64, 128, 256]              # MAISI v2: 3-level encoder
+  num_res_blocks: [2, 2, 2]             # 2 resblocks per level
+  attention_levels: [false, false, false]  # MAISI v2: NO attention (recon task)
+  latent_channels: 4
+  norm_num_groups: 32                   # all channels divisible by 32
+  use_checkpoint: false                 # patch training keeps memory low
+
+discriminator:
+  spatial_dims: 3
+  num_layers_d: 3
+  channels: 32                          # MAISI v2 PatchDiscriminator
+  in_channels: 1
+  out_channels: 1
+  norm: "INSTANCE"
+
+loss:
+  recon_type: "l1"                      # L1Loss(reduction="mean")
+  kl_weight: 1.0e-7                     # MAISI v2 (was 1e-6 in v1; too tight)
+  perceptual_weight: 0.3                # NEW: LPIPS-squeeze, 2.5D 三轴
+  perceptual_network_type: "squeeze"    # SqueezeNet pretrained on ImageNet (2D)
+  perceptual_is_fake_3d: true
+  perceptual_fake_3d_ratio: 0.2         # 20% slices/axis (省显存 + reg)
+  adv_weight: 0.1                       # NEW: PatchAdversarialLoss(least_squares)
+  adv_criterion: "least_squares"
+
+optim:
+  lr: 1.0e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+  amp_eps: 1.0e-6                       # MAISI v2: 1e-6 with amp, else 1e-8
+  warmup_lt10: 0.01                     # epoch < 10 effective lr × 0.01
+  warmup_lt20: 0.1                      # epoch < 20 effective lr × 0.1
+  warmup_else: 1.0                      # epoch ≥ 20 effective lr × 1.0
+
+train:
+  batch_size: 4                         # patch 64³ × bs=4 ≈ 15-20 GB (vs v1 OOM at bs=2)
+  patch_size: [64, 64, 64]              # random crop during training
+  n_epochs: 300                         # original 100 → 300 (continue from epoch 100 ckpt)
+  grad_accum_steps: 1                   # NOT WIRED in train_vae_v2.py — keep 1
+  amp: true                             # torch.autocast fp16 + GradScaler
+  amp_init_scale: 256.0                 # = 2**8 (default 2**16 too aggressive for GAN)
+  amp_growth_factor: 1.5                # default 2.0 too aggressive for GAN
+  log_every_steps: 50
+  val_every_epochs: 5
+  ckpt_every_epochs: 10
+  ckpt_dir: "experiments/checkpoints/vae_v2"
+
+val:
+  patch_size: null                      # null → run val on whole 192³ via sliding-window
+  sliding_window_patch_size: [64, 64, 64]
+  sliding_window_overlap: 0.0           # MAISI tutorial uses 0; bump to 0.25 if seams visible
+  sliding_window_sw_batch_size: 1
+
+wandb:
+  project: "cardiac-vae"
+  enabled: true                         # smoke flag overrides to false

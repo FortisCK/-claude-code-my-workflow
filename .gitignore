@@ -97,6 +97,10 @@ data/imagecas/processed/
 # Training outputs (binary checkpoints, large, regenerable)
 experiments/checkpoints/
 
+# Local Weights & Biases cache (large, per-machine; run IDs are recorded in
+# run cards instead)
+wandb/
+
 # Smoke / generated run artifacts (regenerable; force-add real-run records)
 experiments/runs/eval_v1/
 experiments/runs/*/smoke/

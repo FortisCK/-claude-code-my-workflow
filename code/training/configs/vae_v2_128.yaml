@@ -1,0 +1,90 @@
+# vae_v2_128.yaml — Stage-2 finetune of vae_v2 at patch 128³.
+#
+# MAISI release-style 2-stage VAE training:
+#   Stage 1 (DONE): patch 64³ × bs=4, 100 epochs → epoch_080 ≈ 39 HU val L1
+#   Stage 2 (this): patch 128³ × bs=1, 200 epochs resume from epoch_100
+#
+# Why 128³: cardiac heart ~100 mm at 1mm³ — 64³ only covers half. 128³ lets
+# perceptual + adversarial loss see complete anatomy.
+#
+# Run-card slug placeholder: experiments/runs/<DATE>_<HHMM>_vae-v2-128-finetune.md
+
+run:
+  slug: "vae_v2"                       # same dir as stage-1; new ckpts append (epoch_110+)
+  seed: 42
+  device: "cuda"
+
+data:
+  processed_dir: null
+  split_file: "data/imagecas/splits/v1.json"
+  case_ids_train: null
+  case_ids_val: null
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+augmentation:
+  p_flip: 0.5
+  rotate_range_deg: 5.0
+  shift_range_voxels: 2
+  intensity_shift_offset: 0.05
+
+model:
+  in_channels: 1
+  out_channels: 1
+  channels: [64, 128, 256]
+  num_res_blocks: [2, 2, 2]
+  attention_levels: [false, false, false]
+  latent_channels: 4
+  norm_num_groups: 32
+  use_checkpoint: true                 # activation ckpt — trade 15% wall-clock for ~30% VRAM (128³ × bs=1 needs it)
+
+discriminator:
+  spatial_dims: 3
+  num_layers_d: 3
+  channels: 32
+  in_channels: 1
+  out_channels: 1
+  norm: "INSTANCE"
+
+loss:
+  recon_type: "l1"
+  kl_weight: 1.0e-7
+  perceptual_weight: 0.3
+  perceptual_network_type: "squeeze"
+  perceptual_is_fake_3d: true
+  perceptual_fake_3d_ratio: 0.2
+  adv_weight: 0.1
+  adv_criterion: "least_squares"
+
+optim:
+  lr: 1.0e-5                           # finetune lr (10× lower than stage-1); was 1e-4 too aggressive
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+  amp_eps: 1.0e-6
+  warmup_lt10: 0.01                    # already past these thresholds at resume
+  warmup_lt20: 0.1
+  warmup_else: 1.0
+
+train:
+  batch_size: 2                        # 128³ × bs=2 + use_checkpoint ≈ 35-40 GB; GPU now fully free (48 GB)
+  patch_size: [128, 128, 128]          # ↑ from 64³, covers full cardiac anatomy
+  n_epochs: 500                        # resume from 300 → +200 finetune epochs
+  grad_accum_steps: 1
+  amp: true
+  amp_init_scale: 256.0
+  amp_growth_factor: 1.5
+  log_every_steps: 50
+  val_every_epochs: 5
+  ckpt_every_epochs: 10
+  ckpt_dir: "experiments/checkpoints/vae_v2"
+
+val:
+  patch_size: null
+  sliding_window_patch_size: [128, 128, 128]
+  sliding_window_overlap: 0.0
+  sliding_window_sw_batch_size: 1
+
+wandb:
+  project: "cardiac-vae"
+  enabled: true

@@ -71,3 +71,8 @@ scripts/python/smoke_dataset.py   ~110 LoC (Step 2 smoke harness)
 
 总计 ~2200 LoC + 2 YAML(plan 估的是 ~1380 LoC,实际多出来主要是 train_diffusion
 的 dataloader / VAE-loader / EMA / config-resolution 这几块比预期细)。
+
+
+---
+**Context compaction (auto) at 16:09**
+Check git log and quality_reports/plans/ for current state.
