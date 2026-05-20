@@ -4,66 +4,46 @@ paths:
   - "Quarto/**/*.qmd"
 ---
 
-# Beamer → Quarto Auto-Sync Rule (MANDATORY)
+# Beamer -> Quarto Sync Rule
 
-**Every edit to a Beamer `.tex` file MUST be immediately synced to the corresponding Quarto `.qmd` file — automatically, without the user asking.** This is non-negotiable.
+This repository is primarily a CATHACTION participant submission repo. Beamer and Quarto are optional support surfaces for presentations, explanations, and publication visuals.
 
-## The Rule
+When a Beamer `.tex` deck has a Quarto `.qmd` mirror, every content edit to the Beamer file must be propagated to the Quarto file in the same task. Do not let challenge facts, metric definitions, equations, or claims drift between formats.
 
-When you modify a Beamer `.tex` file, you MUST also apply the equivalent change to the Quarto `.qmd` (if it exists) **in the same task**, before reporting completion. Do NOT wait to be asked. Do NOT just "flag the drift." Just do it.
+## Deck Mapping
 
-## Lecture Mapping
+| Artifact | Beamer | Quarto | Status |
+|---------|--------|--------|--------|
+| Setup demo | `Slides/HelloWorld.tex` | `Quarto/HelloWorld.qmd` | Demo only; remove or ignore for real challenge work |
 
-<!-- Customize this table for your lectures -->
-| Lecture | Beamer | Quarto |
-|---------|--------|--------|
-| 1 | `Slides/Lecture1_Topic.tex` | `Quarto/Lecture1_Topic.qmd` |
-| 2 | `Slides/Lecture2_Topic.tex` | `Quarto/Lecture2_Topic.qmd` |
-<!-- Add rows as you create lectures -->
+Add real CATHACTION decks here when created.
 
-## Workflow (Every Time)
+## Workflow
 
-1. Apply fix to Beamer `.tex`
-2. **Immediately** apply equivalent fix to Quarto `.qmd`
-3. Compile Beamer (3-pass xelatex)
-4. Render Quarto (`./scripts/sync_to_docs.sh LectureN`)
-5. Only then report task complete
+1. Apply content fix to Beamer `.tex`.
+2. Apply equivalent content fix to Quarto `.qmd` if a mirror exists.
+3. Compile Beamer.
+4. Render Quarto with `./scripts/sync_to_docs.sh LectureN`.
+5. Report both verification results.
 
-## LaTeX → Quarto Translation Reference
+## Translation Reference
 
 | Beamer | Quarto Equivalent |
 | ------ | ----------------- |
 | `\muted{text}` | `[text]{style="color: #525252;"}` |
-| `\key{text}` | `[**text**]{.emorygold}` |
+| `\key{text}` | `[**text**]{.hi-gold}` |
 | `\textcolor{positive}{text}` | `[text]{.positive}` |
 | `\textcolor{negative}{text}` | `[text]{.negative}` |
 | `\item text` | `- text` |
-| `\begin{highlightbox}` | `::: {.highlightbox}` |
-| `\begin{methodbox}` | `::: {.methodbox}` |
-| `$formula$` | `$formula$` (same) |
+| `$formula$` | `$formula$` |
 
-## When NOT to Sync
+## When Not To Sync
 
-- Quarto file doesn't exist yet
-- Change is LaTeX-only infrastructure (preamble, theme files)
-- Explicitly told to skip Quarto sync
+- No Quarto mirror exists.
+- The change is LaTeX-only infrastructure.
+- The user explicitly asks to skip Quarto sync.
+- The file is a demo or scratch deck outside the approved task.
 
-## Precedence when the Quarto file has manual post-translation edits
+## Precedence
 
-This rule (auto-sync) and [`single-source-of-truth.md`](single-source-of-truth.md) (Beamer is authoritative) can conflict after a human has hand-edited the Quarto file. Resolution:
-
-1. **Beamer remains authoritative.** Hand-edits to Quarto that add *content* (new slides, different equations) are a violation of SSOT and should be backported to Beamer first, then re-synced down.
-2. **Presentation-only divergence is allowed.** HTML-specific callouts (e.g., `.smaller`, `{.scrollable}`, plotly embeds) can live only in Quarto. Auto-sync should not delete them when propagating Beamer edits — diff before overwriting.
-3. **On ambiguity, regenerate the Quarto file from Beamer** (e.g. `/translate-to-quarto [file]` into a scratch path, then diff against the existing Quarto) so you can compare structurally. Merge manually, keeping HTML-only decorations.
-4. **If the two files have drifted structurally** (slide count mismatch, reordered sections), treat as a bug and fix Beamer first, then regenerate Quarto from scratch via `/translate-to-quarto`.
-
-## Enforcement
-
-Before marking any Beamer editing task as complete, check:
-> "Did I also update the Quarto file?"
-
-If the answer is no and a Quarto file exists, **you are NOT done.**
-
-## When to Update This Table
-
-After creating a new Quarto translation, add it to the mapping table above.
+Beamer remains authoritative for mirrored slide content. Quarto-only presentation decorations are allowed only when they do not alter scientific facts, metrics, or claims.

@@ -1,14 +1,14 @@
 # Preambles
 
-Shared LaTeX/Beamer preamble for lectures in this project.
+Shared LaTeX/Beamer preamble for CATHACTION presentations, method-report figures, and optional slide decks.
 
-## Usage in a lecture
+## Usage in a deck
 
 ```latex
 \documentclass{beamer}
 \input{header}   % resolves via TEXINPUTS=../Preambles:$TEXINPUTS
 
-\title{Your Lecture}
+\title{CATHACTION Method}
 \author{You}
 \date{\today}
 
@@ -18,7 +18,7 @@ Shared LaTeX/Beamer preamble for lectures in this project.
 \end{document}
 ```
 
-Compile with `/compile-latex <file>` — the skill sets `TEXINPUTS` for you. For manual compilation:
+Compile with `/compile-latex <file>` -- the skill sets `TEXINPUTS` for you. For manual compilation:
 
 ```bash
 cd Slides
@@ -37,7 +37,7 @@ The `scripts/check-palette-sync.sh` script greps both files and reports any dive
 
 It's also invoked (non-blocking) from `./scripts/validate-setup.sh`.
 
-When you customize the palette for your project:
+When you customize the palette:
 
 1. Edit HEX values in both `Preambles/header.tex` (LaTeX) **and** `Quarto/theme-template.scss` (SCSS).
 2. Keep the names aligned: `primary-blue`, `primary-gold`, `highlight-yellow`, `light-bg`, `jet`, `positive`, `negative`, `neutral`, `hi-slate`, `hi-green`, `hi-red`.
@@ -46,13 +46,13 @@ When you customize the palette for your project:
 ## What's inside
 
 - **Palette** — 11 named colors matching the SCSS.
-- **Beamer theme assignments** — structure, titles, itemize, alert, blocks, minimal footer. Applied only under Beamer (`\@ifundefined{beamertemplate}`).
-- **TikZ libraries** — `arrows.meta, positioning, calc, decorations.pathreplacing, fit, shapes.geometric, backgrounds`.
-- **Shared TikZ styles** — `dag-node`, `decision-node`, `observed-edge`, `counterfactual-edge`, `confound-edge`, `observed-dot`, `counterfactual-dot`. Used by `templates/tikz-snippets/` and reusable in hand-written diagrams.
-- **Convenience macros** — `\muted{...}`, `\key{...}`, `\good{...}`, `\bad{...}`, `\transitionslide{...}`.
+- **Beamer theme assignments** -- structure, titles, itemize, alert, blocks, minimal footer.
+- **TikZ libraries** -- `arrows.meta, positioning, calc, decorations.pathreplacing, fit, shapes.geometric, backgrounds`.
+- **Shared TikZ styles** -- reusable diagram styles for method schematics and result summaries.
+- **Convenience macros** -- `\muted{...}`, `\key{...}`, `\good{...}`, `\bad{...}`, `\transitionslide{...}`.
 
 ## Extending
 
-Add packages your lectures need *after* your `\input{header}` in each lecture, not in this file — that keeps the preamble small and auditable. Only add to `header.tex` if you are certain every lecture in the project needs it.
+Add packages a specific deck needs *after* `\input{header}`, not in this file. Keep this preamble small and auditable. Only add to `header.tex` if every CATHACTION deck or figure source needs it.
 
-For a lecture-specific preamble (rare), create `Preambles/lectureN-addon.tex` and `\input` it after `header.tex`.
+For a deck-specific preamble (rare), create `Preambles/[deck]-addon.tex` and `\input` it after `header.tex`.

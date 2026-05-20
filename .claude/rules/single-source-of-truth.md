@@ -3,67 +3,67 @@ paths:
   - "Figures/**/*"
   - "Quarto/**/*.qmd"
   - "Slides/**/*.tex"
+  - "scripts/**/*"
+  - "src/**/*"
+  - "*.tex"
+  - "*.md"
 ---
 
-# Single Source of Truth: Enforcement Protocol
+# Single Source of Truth: CATHACTION
 
-**The Beamer `.tex` file is the authoritative source for ALL content.** Everything else is derived.
+Different artifact families have different authoritative sources. Do not edit derived artifacts as if they were primary.
 
-## The SSOT Chain
-
-```
-Beamer .tex (SOURCE OF TRUTH)
-  ├── extract_tikz.tex → PDF → SVGs (derived)
-  ├── Quarto .qmd → HTML (derived)
-  ├── Bibliography_base.bib (shared)
-  └── Figures/LectureN/*.rds → plotly charts (data source)
-
-NEVER edit derived artifacts independently.
-ALWAYS propagate changes from source → derived.
-```
-
----
-
-## TikZ Freshness Protocol (MANDATORY)
-
-**Before using ANY TikZ SVG in a Quarto slide, verify it matches the current Beamer source.**
-
-### Diff-Check Procedure
-
-1. Read the TikZ block from the Beamer `.tex` file
-2. Read the corresponding block from `Figures/LectureN/extract_tikz.tex`
-3. Compare EVERY coordinate, label, color, opacity, and anchor point
-4. If ANY difference exists: update `extract_tikz.tex` from Beamer, recompile, regenerate SVGs
-5. Only then reference the SVG in the QMD
-
-### When to Re-Extract
-
-Re-extract ALL TikZ diagrams when:
-- The Beamer `.tex` file has been modified since last extraction
-- Starting a new Quarto translation
-- Any TikZ-related quality issue is reported
-- Before any commit that includes QMD changes
-
----
-
-## Environment Parity (MANDATORY)
-
-**Every Beamer environment MUST have a CSS equivalent before translation begins.**
-
-1. Scan the Beamer source for all custom environments
-2. Check each against your theme SCSS file
-3. If ANY environment is missing from SCSS, create it BEFORE translating
-
----
-
-## Content Fidelity Checklist
+## Challenge Facts
 
 ```
-[ ] Frame count: Beamer frames == Quarto slides
-[ ] Math check: every equation appears with identical notation
-[ ] Citation check: every \cite has a @key in Quarto
-[ ] Environment check: every Beamer box has CSS equivalent
-[ ] Figure check: every \includegraphics has SVG or plotly equivalent
-[ ] No added content: Quarto does not invent slides not in Beamer
-[ ] No dropped content: every Beamer idea appears in Quarto
+2026-04-22 CATHACTION MICCAI PDF (SOURCE OF TRUTH)
+  ├── README / guide / docs summaries
+  ├── method report background
+  ├── slide decks
+  └── reviewer knowledge base
 ```
+
+If the official 2026 challenge platform or website later supersedes the PDF, record that decision in `quality_reports/decisions/` and update all summaries together.
+
+## Code And Results
+
+```
+Source code + config + split file + checkpoint (SOURCE OF RESULT)
+  ├── prediction files
+  ├── metric tables
+  ├── paper numbers
+  └── figures
+```
+
+Every number in the method report must be reproducible from a named code path and config. Do not manually edit derived CSVs, tables, or predictions to make a result look better.
+
+## Submission Package
+
+```
+Dockerfile + inference entrypoint + model artifacts (SOURCE OF SUBMISSION)
+  ├── platform container
+  ├── result file in challenge schema
+  └── submission description
+```
+
+Container behavior must match the method report. If a local script differs from the Docker path, treat that as a bug until reconciled.
+
+## Slides And Quarto (When Used)
+
+```
+Beamer .tex (slide SOURCE OF TRUTH)
+  ├── extract_tikz.tex -> PDF -> SVGs
+  ├── Quarto .qmd -> HTML
+  ├── Bibliography_base.bib
+  └── Figures/* outputs
+```
+
+For mirrored slide decks, propagate content changes from Beamer to Quarto. Presentation-only divergence in Quarto is allowed only when it does not change facts, notation, metrics, or claims.
+
+## Required Checks Before Reporting Completion
+
+- Challenge facts match the PDF or a documented later source.
+- Reported metrics trace to code/config/split/checkpoint.
+- Predictions and tables are generated, not hand-edited.
+- Docker submission path is aligned with local inference path when packaging exists.
+- Slide mirrors remain synchronized when both Beamer and Quarto versions exist.

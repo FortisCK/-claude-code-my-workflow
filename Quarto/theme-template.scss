@@ -1,20 +1,18 @@
 /*-- scss:defaults --*/
 
 // ==============================================================================
-// INSTITUTIONAL COLORS
+// CATHACTION COLORS
 // ==============================================================================
-// Customize these for your university/institution:
-//   1. Replace color values with your institution's brand colors
-//   2. Update variable names if desired (but keep the semantic mapping)
-//   3. The rest of the theme adapts automatically
+// Palette for endovascular fluoroscopy figures and presentations.
+// Keep these names aligned with Preambles/header.tex.
 
-$primary-blue: #012169;        // Primary institutional color (headings, accents)
-$primary-gold: #B9975B;        // Secondary color (emphasis, borders)
-$highlight-yellow: #F2A900;    // Highlight color (markers, alerts)
-$light-bg: #E8EDF5;           // Light background for title/section slides
+$primary-blue: #0B3C5D;        // Vascular blue for headings and structure
+$primary-gold: #D9A441;        // Warm highlight for rankings and emphasis
+$highlight-yellow: #F0C75E;    // Alert/highlight color
+$light-bg: #EEF6F8;            // Light clinical background
 
 // Semantic color mapping (don't change these names)
-$jet: #1a1a1a;
+$jet: #172026;
 $accent: $primary-blue;
 $accent2: $primary-gold;
 $right-arrow: "\2192";
@@ -179,10 +177,10 @@ $selection-bg: $primary-gold !default;
 
 .alert { color: $primary-gold; }
 
-// Customize these class names for your institution:
-.emoryblue { color: $primary-blue; }
-.emorygold { color: $primary-gold; }
-.emoryyellow { color: $highlight-yellow; }
+// Project color utility classes
+.cathaction-blue { color: $primary-blue; }
+.cathaction-gold { color: $primary-gold; }
+.cathaction-yellow { color: $highlight-yellow; }
 
 // Semantic colors for diagrams and annotations
 .positive {
@@ -196,16 +194,16 @@ $selection-bg: $primary-gold !default;
 }
 
 .neutral {
-  color: #525252 !important;  // Gray - reference/context
+  color: #5F6F7A !important;  // Gray-blue - reference/context
 }
 
 // Highlight classes
 .hi { font-weight: 600; color: $primary-blue !important; }
 .hi-gold { font-weight: 600; color: $primary-gold !important; }
 .hi-yellow { font-weight: 600; color: $highlight-yellow !important; }
-.hi-slate { font-weight: 600; color: #314f4f !important; }
-.hi-green { font-weight: 600; color: #2E8B57 !important; }
-.hi-red { font-weight: 600; color: #C41E3A !important; }
+.hi-slate { font-weight: 600; color: #2C4A52 !important; }
+.hi-green { font-weight: 600; color: #1F8A70 !important; }
+.hi-red { font-weight: 600; color: #C43C3C !important; }
 
 .fg { color: var(--col, $jet); }
 .bg {

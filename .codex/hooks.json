@@ -1,0 +1,60 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'PROJECT_DIR=\"${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}\"; export CLAUDE_PROJECT_DIR=\"$PROJECT_DIR\"; python3 \"$PROJECT_DIR/.codex/hooks/context-monitor.py\"'",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'PROJECT_DIR=\"${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}\"; export CLAUDE_PROJECT_DIR=\"$PROJECT_DIR\"; python3 \"$PROJECT_DIR/.codex/hooks/verify-reminder.py\"'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'PROJECT_DIR=\"${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}\"; export CLAUDE_PROJECT_DIR=\"$PROJECT_DIR\"; python3 \"$PROJECT_DIR/.codex/hooks/pre-compact.py\"'",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "compact|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'PROJECT_DIR=\"${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}\"; export CLAUDE_PROJECT_DIR=\"$PROJECT_DIR\"; python3 \"$PROJECT_DIR/.codex/hooks/post-compact-restore.py\"'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 'PROJECT_DIR=\"${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$PWD}}\"; export CLAUDE_PROJECT_DIR=\"$PROJECT_DIR\"; python3 \"$PROJECT_DIR/.codex/hooks/log-reminder.py\"'",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
