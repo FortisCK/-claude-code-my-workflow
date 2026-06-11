@@ -1,0 +1,576 @@
+{
+  "checkpoint": "experiments/checkpoints/residual_gate_v1/train100_e060/epoch_060.pt",
+  "weights": "ema",
+  "model_meta": {
+    "checkpoint_epoch": 60,
+    "model_cfg": {
+      "in_channels": 6,
+      "features": [
+        16,
+        16,
+        32,
+        64,
+        128,
+        16
+      ],
+      "g_max": 0.25,
+      "init_bias": -4.0,
+      "clamp_output": false
+    },
+    "cache_dir_train": "experiments/cache/residual_diffusion_features/v1_train100_val20_test5"
+  },
+  "cache_dir": "experiments/cache/residual_diffusion_features/v1_test100",
+  "metrics_csv": "experiments/runs/residual_gate_v1/eval_train100_e060_test100_epoch060/metrics.csv",
+  "selected_cases": [
+    {
+      "split": "test",
+      "case_id": "160",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_160.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "162",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_162.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "166",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_166.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "171",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_171.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "182",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_182.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "185",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_185.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "186",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_186.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "187",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_187.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "188",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_188.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "197",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_197.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "198",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_198.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "21",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_21.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "216",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_216.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "235",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_235.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "246",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_246.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "251",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_251.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "252",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_252.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "261",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_261.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "272",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_272.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "298",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_298.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "300",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_300.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "312",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_312.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "316",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_316.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "32",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_32.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "328",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_328.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "335",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_335.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "339",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_339.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "350",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_350.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "375",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_375.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "378",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_378.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "383",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_383.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "397",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_397.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "407",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_407.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "41",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_41.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "419",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_419.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "434",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_434.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "441",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_441.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "460",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_460.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "468",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_468.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "481",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_481.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "483",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_483.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "498",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_498.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "50",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_50.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "51",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_51.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "513",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_513.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "526",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_526.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "53",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_53.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "532",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_532.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "535",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_535.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "54",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_54.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "543",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_543.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "547",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_547.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "563",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_563.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "564",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_564.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "568",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_568.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "584",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_584.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "586",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_586.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "596",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_596.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "601",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_601.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "61",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_61.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "619",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_619.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "625",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_625.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "630",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_630.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "634",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_634.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "642",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_642.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "662",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_662.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "68",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_68.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "69",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_69.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "692",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_692.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "696",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_696.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "721",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_721.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "729",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_729.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "732",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_732.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "733",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_733.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "743",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_743.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "768",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_768.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "776",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_776.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "787",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_787.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "796",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_796.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "798",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_798.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "803",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_803.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "808",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_808.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "817",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_817.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "821",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_821.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "826",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_826.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "830",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_830.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "85",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_85.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "854",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_854.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "860",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_860.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "874",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_874.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "892",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_892.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "911",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_911.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "912",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_912.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "927",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_927.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "943",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_943.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "95",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_95.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "952",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_952.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "969",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_969.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "983",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_983.npz"
+    },
+    {
+      "split": "test",
+      "case_id": "998",
+      "path": "experiments/cache/residual_diffusion_features/v1_test100/test/case_998.npz"
+    }
+  ],
+  "bin_specs": {
+    "gate": [
+      0.001,
+      0.005,
+      0.01,
+      0.02,
+      0.05,
+      0.1,
+      0.15,
+      0.2
+    ],
+    "residual_std_hu": [
+      10.0,
+      20.0,
+      40.0,
+      60.0,
+      80.0,
+      120.0
+    ],
+    "residual_snr": [
+      0.1,
+      0.25,
+      0.5,
+      1.0,
+      2.0,
+      4.0
+    ],
+    "residual_abs_hu": [
+      5.0,
+      10.0,
+      20.0,
+      40.0,
+      80.0,
+      120.0
+    ],
+    "applied_abs_hu": [
+      0.05,
+      0.1,
+      0.25,
+      0.5,
+      1.0,
+      2.0,
+      5.0
+    ]
+  },
+  "outputs": {
+    "region_summary": "experiments/runs/residual_gate_v1/calibration_test100_epoch060/region_summary.csv",
+    "bin_summary": "experiments/runs/residual_gate_v1/calibration_test100_epoch060/bin_summary.csv",
+    "case_summary": "experiments/runs/residual_gate_v1/calibration_test100_epoch060/case_summary.csv"
+  }
+}
