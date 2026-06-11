@@ -1,0 +1,73 @@
+# residual_gate_v2_sparse_oracle.yaml - sparse improvement-supervised gate.
+#
+# The dense v2 oracle BCE target over-released residuals. This variant keeps the
+# per-voxel oracle gate, but only supervises positive gate values where the oracle
+# correction clearly improves local absolute error.
+
+run:
+  slug: "residual_gate_v2_sparse_oracle"
+  seed: 42
+  device: "cuda"
+
+data:
+  cache_dir: "experiments/cache/residual_diffusion_features/v1_train100_val20_test5"
+  train_splits: ["train"]
+  val_splits: ["val"]
+  case_ids_train: null
+  case_ids_val: null
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+model:
+  in_channels: 6
+  features: [16, 16, 32, 64, 128, 16]
+  g_max: 0.25
+  init_bias: -4.0
+  clamp_output: false
+
+loss:
+  final_l1_weight: 1.0
+  heart_l1_weight: 1.5
+  boundary_l1_weight: 1.5
+  boundary_gradient_weight: 0.2
+  gate_l1_weight: 0.01
+  gate_tv_weight: 0.01
+  boundary_radius: 3
+
+  # About 2 HU in the normalized [-1, 1] scale used by the metrics.
+  # This removes tiny, unreliable oracle improvements from the target.
+  oracle_gate_min_improvement: 0.001
+  oracle_gate_weight: 0.25
+  oracle_gate_loss: "l1"
+  oracle_gate_eps: 1.0e-5
+  oracle_gate_min_target: 0.01
+  oracle_gate_base_weight: 0.10
+  oracle_gate_positive_weight: 6.0
+  oracle_gate_heart_weight: 1.0
+  oracle_gate_boundary_weight: 3.0
+
+ema:
+  enabled: true
+  decay: 0.999
+
+optim:
+  lr: 1.0e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+
+train:
+  batch_size: 1
+  patch_size: [128, 128, 128]
+  samples_per_case_per_epoch: 4
+  heart_patch_prob: 0.75
+  n_epochs: 20
+  grad_accum_steps: 1
+  amp: true
+  log_every_steps: 25
+  ckpt_every_epochs: 5
+  ckpt_dir: "experiments/checkpoints/residual_gate_v2_sparse_oracle"
+
+wandb:
+  project: "cardiac-diffusion"
+  enabled: true

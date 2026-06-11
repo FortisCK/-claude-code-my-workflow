@@ -6,6 +6,9 @@ device. They are stateless and are meant to be composed in `run_eval.py`.
 PSNR / SSIM / NRMSE: image-quality metrics on the [-1, 1] HU-normalized
 domain (consistent with VAE input/output range).
 
+Masked and boundary metrics support paper-oriented evaluation: heart-region
+errors, heart-boundary errors, and edge/gradient preservation.
+
 dice_lumen: a *stub* downstream-task metric — Dice between two binarized
 masks at HU > threshold. Not yet calibrated for TAVI; placeholder until
 the lumen-segmentation pipeline lands (Week 9+, see brief §07 novelty 3).
@@ -23,6 +26,97 @@ import math
 import torch
 import torch.nn.functional as F
 from monai.metrics import SSIMMetric
+
+
+def _as_bool_mask(mask: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
+    """Return `mask` as a 5D bool tensor broadcast-compatible with `ref`."""
+    if mask.dim() == 3:
+        mask = mask.unsqueeze(0).unsqueeze(0)
+    elif mask.dim() == 4:
+        mask = mask.unsqueeze(1)
+    if mask.dim() != ref.dim():
+        raise ValueError(f"mask dim {mask.dim()} does not match ref dim {ref.dim()}")
+    if mask.shape[0] not in {1, ref.shape[0]}:
+        raise ValueError(f"mask batch {mask.shape[0]} incompatible with ref batch {ref.shape[0]}")
+    if mask.shape[1] not in {1, ref.shape[1]}:
+        raise ValueError(f"mask channels {mask.shape[1]} incompatible with ref channels {ref.shape[1]}")
+    if tuple(mask.shape[-3:]) != tuple(ref.shape[-3:]):
+        raise ValueError(f"mask spatial shape {tuple(mask.shape[-3:])} != {tuple(ref.shape[-3:])}")
+    return mask.to(device=ref.device, dtype=torch.bool)
+
+
+def masked_mean(values: torch.Tensor, mask: torch.Tensor, eps: float = 1e-8) -> torch.Tensor:
+    """Per-sample mean of `values` inside `mask`.
+
+    Args:
+        values: `(B, C, D, H, W)` tensor.
+        mask: bool-like `(B, 1, D, H, W)`, `(1, 1, D, H, W)`, or `(D, H, W)`.
+    """
+    mask_bool = _as_bool_mask(mask, values)
+    mask_f = mask_bool.to(dtype=values.dtype)
+    if mask_f.shape[0] == 1 and values.shape[0] > 1:
+        mask_f = mask_f.expand(values.shape[0], -1, -1, -1, -1)
+    if mask_f.shape[1] == 1 and values.shape[1] > 1:
+        mask_f = mask_f.expand(-1, values.shape[1], -1, -1, -1)
+    denom = mask_f.flatten(1).sum(dim=1)
+    if torch.any(denom <= 0):
+        raise ValueError("masked metric received an empty mask")
+    num = (values * mask_f).flatten(1).sum(dim=1)
+    return num / denom.clamp_min(eps)
+
+
+def masked_mae(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Per-sample MAE inside `mask`."""
+    return masked_mean((pred - target).abs(), mask)
+
+
+def masked_rmse(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Per-sample RMSE inside `mask`."""
+    return masked_mean((pred - target).pow(2), mask).sqrt()
+
+
+def make_boundary_band(mask: torch.Tensor, radius: int = 3) -> torch.Tensor:
+    """Return a dilate-minus-erode boundary band for a 3D binary mask.
+
+    Args:
+        mask: bool-like `(B, 1, D, H, W)`, `(1, 1, D, H, W)`, or `(D, H, W)`.
+        radius: band radius in voxels. With 1 mm preprocessed spacing, radius 3
+            corresponds to a roughly 3 mm neighborhood on each side.
+    """
+    if radius < 1:
+        raise ValueError(f"radius must be >= 1, got {radius}")
+    if mask.dim() == 3:
+        ref = mask.unsqueeze(0).unsqueeze(0)
+    elif mask.dim() == 4:
+        ref = mask.unsqueeze(1)
+    else:
+        ref = mask
+    mask_bool = _as_bool_mask(mask, ref)
+    mask_f = mask_bool.float()
+    kernel = 2 * radius + 1
+
+    dilated = F.max_pool3d(mask_f, kernel_size=kernel, stride=1, padding=radius) > 0.5
+
+    inv = (~mask_bool).float()
+    padded_inv = F.pad(inv, (radius, radius, radius, radius, radius, radius), value=1.0)
+    eroded = (1.0 - F.max_pool3d(padded_inv, kernel_size=kernel, stride=1)) > 0.5
+    return torch.logical_and(dilated, torch.logical_not(eroded))
+
+
+def gradient_magnitude(volume: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    """Forward-difference 3D gradient magnitude with original spatial shape."""
+    dz = torch.zeros_like(volume)
+    dy = torch.zeros_like(volume)
+    dx = torch.zeros_like(volume)
+    dz[..., :-1, :, :] = volume[..., 1:, :, :] - volume[..., :-1, :, :]
+    dy[..., :, :-1, :] = volume[..., :, 1:, :] - volume[..., :, :-1, :]
+    dx[..., :, :, :-1] = volume[..., :, :, 1:] - volume[..., :, :, :-1]
+    return torch.sqrt(dx.pow(2) + dy.pow(2) + dz.pow(2) + eps)
+
+
+def masked_gradient_l1(pred: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Per-sample L1 error between gradient magnitudes inside `mask`."""
+    return masked_mean((gradient_magnitude(pred) - gradient_magnitude(target)).abs(), mask)
 
 
 def psnr(pred: torch.Tensor, target: torch.Tensor, data_range: float = 2.0) -> torch.Tensor:

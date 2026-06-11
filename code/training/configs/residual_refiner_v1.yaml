@@ -1,0 +1,69 @@
+# residual_refiner_v1.yaml - deterministic U-Net residual refiner pilot.
+#
+# This is v2.0 in the posterior-residual roadmap. It freezes U-Net v1 as a
+# deterministic initializer and trains a second 3D U-Net to predict the residual
+# left by that initializer:
+#
+#   x_u = frozen_unet(corrupted)
+#   target = clean - x_u
+#   final = x_u + refiner([corrupted, x_u, corrupted - x_u])
+
+run:
+  slug: "residual_refiner_v1"
+  seed: 42
+  device: "cuda"
+
+data:
+  processed_dir: null
+  case_ids_train: null
+  case_ids_val: null
+  split_file: "data/imagecas/splits/v1.json"
+  val_split: 0.05
+  pair_mode: "precomputed"
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+augmentation:
+  p_flip: 0.5
+  rotate_range_deg: 5.0
+  shift_range_voxels: 2
+
+initializer:
+  config: "code/training/configs/unet_v1.yaml"
+  ckpt: "experiments/checkpoints/unet_v1/epoch_200.pt"
+  weights: "ema"
+
+model:
+  in_channels: 3
+  out_channels: 1
+  features: [32, 32, 64, 128, 256, 32]
+  clamp_output: false
+
+loss:
+  final_l1_weight: 1.0
+  residual_l1_weight: 0.0
+  gradient_weight: 0.05
+
+ema:
+  enabled: true
+  decay: 0.999
+
+optim:
+  lr: 1.0e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+
+train:
+  batch_size: 1
+  patch_size: [128, 128, 128]
+  n_epochs: 50
+  grad_accum_steps: 1
+  amp: true
+  log_every_steps: 50
+  ckpt_every_epochs: 10
+  ckpt_dir: "experiments/checkpoints/residual_refiner_v1"
+
+wandb:
+  project: "cardiac-diffusion"
+  enabled: true

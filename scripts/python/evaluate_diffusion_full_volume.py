@@ -13,7 +13,8 @@ Usage:
         --out-dir experiments/runs/diffusion_v1/eval_epoch200_full_volume
 
 Outputs:
-    - `metrics.csv`: per-case corrupted, deterministic, and/or stochastic metrics
+    - `metrics.csv`: per-case corrupted, deterministic, and/or stochastic metrics,
+      including global, heart-region, and heart-boundary metrics.
     - `summary.json`: aggregate metrics and run metadata
     - `figures/*.png`: center-slice qualitative panels for the first K cases
 """
@@ -43,19 +44,24 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 import numpy as np
-import torch
 from monai.utils import set_determinism
+import torch
 
 from code.data import paths as path_registry  # noqa: E402
 from code.data.splits import load_split  # noqa: E402
-from code.evaluation.metrics import all_metrics  # noqa: E402
+from code.evaluation.artifact_metrics import (  # noqa: E402
+    HU_SCALE,
+    assign_artifact_severity,
+    load_heart_mask,
+    metric_row,
+    summarize,
+)
 from code.evaluation.run_eval import load_frozen_edm, load_pair  # noqa: E402
 from code.inference.sliding_window import sliding_window_posterior_sample  # noqa: E402
 from code.training.train_diffusion import load_frozen_vae  # noqa: E402
 
 log = logging.getLogger("evaluate_diffusion_full_volume")
 
-HU_SCALE = 2047.5  # [-1, 1] maps to [-1024, 3071].
 DEFAULT_ROI_SIZE = 128
 DEFAULT_OVERLAP = 0.5
 DEFAULT_SIGMA_SCALE = 0.125
@@ -93,6 +99,12 @@ def _build_argparser() -> argparse.ArgumentParser:
         default=Path("experiments/runs/diffusion_v1/eval_epoch200_full_volume"),
     )
     p.add_argument("--figure-cases", type=int, default=5)
+    p.add_argument(
+        "--boundary-radius",
+        type=int,
+        default=3,
+        help="Heart-boundary band radius in voxels for artifact-local metrics.",
+    )
     p.add_argument("--progress", action="store_true", help="Show MONAI sliding-window progress bars.")
     return p
 
@@ -117,19 +129,6 @@ def git_sha() -> str:
         ).strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"
-
-
-def metric_row(prefix: str, pred: torch.Tensor, target: torch.Tensor) -> dict[str, float]:
-    metrics = all_metrics(pred.float(), target.float())
-    abs_err = (pred.float() - target.float()).abs()
-    return {
-        f"{prefix}_mae_norm": float(abs_err.mean().item()),
-        f"{prefix}_mae_hu": float(abs_err.mean().item() * HU_SCALE),
-        f"{prefix}_psnr": float(metrics["psnr"].item()),
-        f"{prefix}_ssim": float(metrics["ssim"].item()),
-        f"{prefix}_nrmse": float(metrics["nrmse"].item()),
-        f"{prefix}_dice_lumen_stub": float(metrics["dice_lumen_stub"].item()),
-    }
 
 
 def save_panel(
@@ -181,27 +180,6 @@ def save_panel(
     plt.close(fig)
 
 
-def summarize(rows: list[dict[str, object]]) -> dict[str, object]:
-    numeric_keys = [k for k, v in rows[0].items() if isinstance(v, float)]
-    out: dict[str, object] = {"n_cases": len(rows), "by_split": {}}
-    for split_name in sorted({str(r["split"]) for r in rows}):
-        split_rows = [r for r in rows if r["split"] == split_name]
-        block: dict[str, object] = {"n_cases": len(split_rows)}
-        for key in numeric_keys:
-            vals = np.asarray([float(r[key]) for r in split_rows], dtype=np.float64)
-            block[f"{key}_mean"] = float(vals.mean())
-            block[f"{key}_std"] = float(vals.std(ddof=0))
-        out["by_split"][split_name] = block
-
-    all_block: dict[str, object] = {"n_cases": len(rows)}
-    for key in numeric_keys:
-        vals = np.asarray([float(r[key]) for r in rows], dtype=np.float64)
-        all_block[f"{key}_mean"] = float(vals.mean())
-        all_block[f"{key}_std"] = float(vals.std(ddof=0))
-    out["all"] = all_block
-    return out
-
-
 @torch.inference_mode()
 def main(argv: Optional[list[str]] = None) -> int:
     args = _build_argparser().parse_args(argv)
@@ -232,12 +210,22 @@ def main(argv: Optional[list[str]] = None) -> int:
     rows: list[dict[str, object]] = []
     for idx, (split_name, case_id) in enumerate(selected):
         clean, corrupted = load_pair(case_id, processed_dir, pair_mode="precomputed")
+        heart_mask = load_heart_mask(case_id, processed_dir, tuple(clean.shape[-3:]))
         row: dict[str, object] = {
             "split": split_name,
             "case_id": case_id,
             "shape": "x".join(str(v) for v in clean.shape[-3:]),
+            "heart_voxels": float(heart_mask.sum().item()),
         }
-        row.update(metric_row("corrupted", corrupted, clean))
+        row.update(
+            metric_row(
+                "corrupted",
+                corrupted,
+                clean,
+                heart_mask=heart_mask,
+                boundary_radius=args.boundary_radius,
+            )
+        )
         predictions: dict[str, torch.Tensor] = {}
 
         if run_det:
@@ -259,7 +247,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
             det = det_out["mean"].float()
             predictions["det"] = det
-            row.update(metric_row(det_prefix, det, clean))
+            row.update(
+                metric_row(
+                    det_prefix,
+                    det,
+                    clean,
+                    heart_mask=heart_mask,
+                    boundary_radius=args.boundary_radius,
+                )
+            )
             row[f"{det_prefix}_delta_mae_norm"] = (
                 float(row[f"{det_prefix}_mae_norm"]) - float(row["corrupted_mae_norm"])
             )
@@ -294,7 +290,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             stoch_std = stoch_out["std"].float()
             predictions["stoch_mean"] = stoch_mean
             predictions["stoch_std"] = stoch_std
-            row.update(metric_row(stoch_prefix, stoch_mean, clean))
+            row.update(
+                metric_row(
+                    stoch_prefix,
+                    stoch_mean,
+                    clean,
+                    heart_mask=heart_mask,
+                    boundary_radius=args.boundary_radius,
+                )
+            )
             row[f"{stoch_prefix}_delta_mae_norm"] = (
                 float(row[f"{stoch_prefix}_mae_norm"]) - float(row["corrupted_mae_norm"])
             )
@@ -314,6 +318,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         if idx < args.figure_cases:
             save_panel(figures_dir / f"{split_name}_case_{case_id}.png", clean, corrupted, predictions)
 
+    assign_artifact_severity(rows)
+
     metrics_path = args.out_dir / "metrics.csv"
     with metrics_path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()), lineterminator="\n")
@@ -329,6 +335,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "blend_mode": args.blend_mode,
         "sigma_scale": args.sigma_scale,
         "sw_batch_size": args.sw_batch_size,
+        "boundary_radius": args.boundary_radius,
         "case_selection": {
             "val_cases": args.val_cases,
             "test_cases": args.test_cases,

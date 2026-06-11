@@ -1,0 +1,77 @@
+# diffusion_v2_residual.yaml - U-Net-conditioned posterior residual EDM.
+
+run:
+  slug: "diffusion_v2_residual"
+  seed: 42
+  device: "cuda"
+
+data:
+  processed_dir: null
+  case_ids_train: null
+  case_ids_val: null
+  split_file: "data/imagecas/splits/v1.json"
+  val_split: 0.05
+  pair_mode: "precomputed"
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+augmentation:
+  p_flip: 0.5
+  rotate_range_deg: 5.0
+  shift_range_voxels: 2
+
+initializer:
+  config: "code/training/configs/unet_v1.yaml"
+  ckpt: "experiments/checkpoints/unet_v1/epoch_200.pt"
+  weights: "ema"
+
+denoiser:
+  target_channels: 1
+  condition_channels: 3
+  channels: [24, 48, 96, 96]
+  num_res_blocks: [2, 2, 2, 2]
+  attention_levels: [false, false, false, false]
+  num_head_channels: [24, 24, 24, 24]
+  norm_num_groups: 24
+
+edm:
+  sigma_min: 0.0005
+  sigma_max: 1.0
+  sigma_data: 0.05
+  rho: 7.0
+  P_mean: -3.0
+  P_std: 1.2
+  S_churn: 0.0
+  S_tmin: 0.001
+  S_tmax: 1.0
+  S_noise: 1.003
+  clip_pred: false
+  clip_value: 1.0
+  final_l1_weight: 0.25
+  residual_l1_weight: 0.0
+  gradient_weight: 0.02
+  num_sample_steps_eval: 32
+
+ema:
+  enabled: true
+  decay: 0.999
+
+optim:
+  lr: 1.0e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+
+train:
+  batch_size: 1
+  patch_size: [128, 128, 128]
+  n_epochs: 20
+  grad_accum_steps: 1
+  amp: true
+  log_every_steps: 25
+  ckpt_every_epochs: 5
+  ckpt_dir: "experiments/checkpoints/diffusion_v2_residual"
+
+wandb:
+  project: "cardiac-diffusion"
+  enabled: true
