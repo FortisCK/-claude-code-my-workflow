@@ -1,0 +1,73 @@
+# residual_gate_v3a.yaml - reliability-aware residual diffusion gate.
+#
+# Same posterior residual cache as v1, but the gate receives explicit structure
+# and reliability channels:
+#   [corrupted, x_u, corrupted - x_u, mu_r, sigma_r, |grad x_u|,
+#    heart_mask, boundary_band, |mu_r| / sigma_r]
+
+run:
+  slug: "residual_gate_v3a"
+  seed: 42
+  device: "cuda"
+
+data:
+  cache_dir: "experiments/cache/residual_diffusion_features/v1_train100_val20_test5"
+  train_splits: ["train"]
+  val_splits: ["val"]
+  case_ids_train: null
+  case_ids_val: null
+  num_workers: 0
+  pin_memory: false
+  persistent_workers: false
+
+model:
+  in_channels: 9
+  features: [16, 16, 32, 64, 128, 16]
+  g_max: 0.25
+  init_bias: -4.0
+  clamp_output: false
+  residual_snr_clip: 4.0
+  feature_names:
+    - corrupted
+    - initial
+    - corrupted_minus_initial
+    - residual_mean
+    - residual_std
+    - grad_initial
+    - heart_mask
+    - boundary_band
+    - residual_snr
+
+loss:
+  final_l1_weight: 1.0
+  heart_l1_weight: 1.0
+  boundary_l1_weight: 1.0
+  boundary_gradient_weight: 0.1
+  gate_l1_weight: 0.01
+  gate_tv_weight: 0.01
+  boundary_radius: 3
+
+ema:
+  enabled: true
+  decay: 0.999
+
+optim:
+  lr: 1.0e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+
+train:
+  batch_size: 1
+  patch_size: [128, 128, 128]
+  samples_per_case_per_epoch: 4
+  heart_patch_prob: 0.75
+  n_epochs: 60
+  grad_accum_steps: 1
+  amp: true
+  log_every_steps: 25
+  ckpt_every_epochs: 5
+  ckpt_dir: "experiments/checkpoints/residual_gate_v3a/train100_e060"
+
+wandb:
+  project: "cardiac-diffusion"
+  enabled: true

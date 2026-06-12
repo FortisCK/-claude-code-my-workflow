@@ -33,6 +33,14 @@ log = logging.getLogger(__name__)
 
 
 FLOAT_KEYS = ("clean", "corrupted", "initial", "residual_mean", "residual_std")
+DEFAULT_GATE_FEATURES = [
+    "corrupted",
+    "initial",
+    "corrupted_minus_initial",
+    "residual_mean",
+    "residual_std",
+    "grad_initial",
+]
 
 
 def build_gate(cfg: DictConfig) -> ResidualGateNet3D:
@@ -117,22 +125,48 @@ def make_gate_features(
     initial: torch.Tensor,
     residual_mean: torch.Tensor,
     residual_std: torch.Tensor,
+    heart_mask: torch.Tensor | None = None,
+    *,
+    feature_names: list[str] | tuple[str, ...] | None = None,
+    boundary_radius: int = 3,
+    residual_snr_clip: float = 4.0,
 ) -> torch.Tensor:
-    """Build the six-channel GateNet feature tensor."""
+    """Build the GateNet feature tensor.
+
+    The default v1 feature set is six channels. v3-style configs can add
+    structure/reliability channels such as `heart_mask`, `boundary_band`, and
+    `residual_snr` while keeping old checkpoints compatible.
+    """
     if corrupted.shape != initial.shape or initial.shape != residual_mean.shape:
         raise ValueError("corrupted, initial, and residual_mean shapes must match")
+    if residual_std.shape != residual_mean.shape:
+        raise ValueError("residual_std and residual_mean shapes must match")
+    names = list(feature_names or DEFAULT_GATE_FEATURES)
     grad_initial = gradient_magnitude(initial.unsqueeze(0))[0]
-    return torch.cat(
-        [
-            corrupted,
-            initial,
-            corrupted - initial,
-            residual_mean,
-            residual_std,
-            grad_initial,
-        ],
-        dim=0,
-    )
+    channels: dict[str, torch.Tensor] = {
+        "corrupted": corrupted,
+        "initial": initial,
+        "corrupted_minus_initial": corrupted - initial,
+        "residual_mean": residual_mean,
+        "residual_std": residual_std,
+        "grad_initial": grad_initial,
+    }
+    if "heart_mask" in names or "boundary_band" in names:
+        if heart_mask is None:
+            raise ValueError("heart_mask is required for heart_mask/boundary_band features")
+        heart_f = heart_mask.to(device=corrupted.device, dtype=corrupted.dtype)
+        if heart_f.shape != corrupted.shape:
+            raise ValueError(f"heart_mask shape {tuple(heart_f.shape)} != {tuple(corrupted.shape)}")
+        channels["heart_mask"] = heart_f
+        boundary = make_boundary_band(heart_f.bool().unsqueeze(0), radius=int(boundary_radius))[0]
+        channels["boundary_band"] = boundary.to(device=corrupted.device, dtype=corrupted.dtype)
+    if "residual_snr" in names:
+        snr = residual_mean.abs() / residual_std.abs().clamp_min(1.0e-4)
+        channels["residual_snr"] = snr.clamp(0.0, float(residual_snr_clip)) / float(residual_snr_clip)
+    try:
+        return torch.cat([channels[name] for name in names], dim=0)
+    except KeyError as exc:
+        raise ValueError(f"unknown GateNet feature name: {exc.args[0]!r}") from exc
 
 
 class CachedResidualFeatureDataset(Dataset):
@@ -144,11 +178,17 @@ class CachedResidualFeatureDataset(Dataset):
         patch_size: tuple[int, int, int],
         samples_per_case_per_epoch: int = 4,
         heart_patch_prob: float = 0.75,
+        feature_names: list[str] | tuple[str, ...] | None = None,
+        boundary_radius: int = 3,
+        residual_snr_clip: float = 4.0,
     ) -> None:
         self.files = list(files)
         self.patch_size = patch_size
         self.samples_per_case_per_epoch = max(1, int(samples_per_case_per_epoch))
         self.heart_patch_prob = float(heart_patch_prob)
+        self.feature_names = list(feature_names or DEFAULT_GATE_FEATURES)
+        self.boundary_radius = int(boundary_radius)
+        self.residual_snr_clip = float(residual_snr_clip)
         if not 0.0 <= self.heart_patch_prob <= 1.0:
             raise ValueError(f"heart_patch_prob must be in [0, 1], got {heart_patch_prob}")
 
@@ -176,6 +216,10 @@ class CachedResidualFeatureDataset(Dataset):
             cropped["initial"],
             cropped["residual_mean"],
             cropped["residual_std"],
+            mask_crop,
+            feature_names=self.feature_names,
+            boundary_radius=self.boundary_radius,
+            residual_snr_clip=self.residual_snr_clip,
         )
         return {
             "features": features.float(),
@@ -190,9 +234,19 @@ class CachedResidualFeatureDataset(Dataset):
 class SyntheticGateDataset(Dataset):
     """Small random dataset for CPU smoke tests."""
 
-    def __init__(self, length: int = 4, spatial: tuple[int, int, int] = (32, 32, 32)) -> None:
+    def __init__(
+        self,
+        length: int = 4,
+        spatial: tuple[int, int, int] = (32, 32, 32),
+        feature_names: list[str] | tuple[str, ...] | None = None,
+        boundary_radius: int = 3,
+        residual_snr_clip: float = 4.0,
+    ) -> None:
         self.length = int(length)
         self.spatial = spatial
+        self.feature_names = list(feature_names or DEFAULT_GATE_FEATURES)
+        self.boundary_radius = int(boundary_radius)
+        self.residual_snr_clip = float(residual_snr_clip)
 
     def __len__(self) -> int:
         return self.length
@@ -210,7 +264,16 @@ class SyntheticGateDataset(Dataset):
         y0, y1 = self.spatial[1] // 4, 3 * self.spatial[1] // 4
         x0, x1 = self.spatial[2] // 4, 3 * self.spatial[2] // 4
         heart_mask[:, z0:z1, y0:y1, x0:x1] = True
-        features = make_gate_features(corrupted, initial, residual_mean, residual_std)
+        features = make_gate_features(
+            corrupted,
+            initial,
+            residual_mean,
+            residual_std,
+            heart_mask,
+            feature_names=self.feature_names,
+            boundary_radius=self.boundary_radius,
+            residual_snr_clip=self.residual_snr_clip,
+        )
         return {
             "features": features.float(),
             "clean": clean.float(),
@@ -376,8 +439,21 @@ def gate_loss(
 
 
 def build_dataloader(cfg: DictConfig, smoke: bool) -> DataLoader:
+    feature_names = list(cfg.model.get("feature_names", DEFAULT_GATE_FEATURES))
+    if len(feature_names) != int(cfg.model.in_channels):
+        raise ValueError(
+            f"model.in_channels={int(cfg.model.in_channels)} but feature_names has {len(feature_names)} entries"
+        )
+    boundary_radius = int(cfg.loss.get("boundary_radius", 3))
+    residual_snr_clip = float(cfg.model.get("residual_snr_clip", 4.0))
     if smoke:
-        ds: Dataset = SyntheticGateDataset(length=4, spatial=_as_3tuple(cfg.train.patch_size))
+        ds: Dataset = SyntheticGateDataset(
+            length=4,
+            spatial=_as_3tuple(cfg.train.patch_size),
+            feature_names=feature_names,
+            boundary_radius=boundary_radius,
+            residual_snr_clip=residual_snr_clip,
+        )
         return DataLoader(ds, batch_size=1, shuffle=True, num_workers=0)
 
     cache_dir = Path(cfg.data.cache_dir)
@@ -391,6 +467,9 @@ def build_dataloader(cfg: DictConfig, smoke: bool) -> DataLoader:
         patch_size=_as_3tuple(cfg.train.patch_size),
         samples_per_case_per_epoch=int(cfg.train.get("samples_per_case_per_epoch", 4)),
         heart_patch_prob=float(cfg.train.get("heart_patch_prob", 0.75)),
+        feature_names=feature_names,
+        boundary_radius=boundary_radius,
+        residual_snr_clip=residual_snr_clip,
     )
     loader = DataLoader(
         ds,

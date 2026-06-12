@@ -146,6 +146,19 @@ def load_gate(config_path: Path, ckpt_path: Path, weights: str, device: torch.de
     return model, meta
 
 
+def gate_feature_kwargs(cfg, model_meta: dict[str, object], boundary_radius: int) -> dict[str, object]:
+    """Return feature-builder kwargs matching the loaded gate checkpoint."""
+    model_cfg = model_meta.get("model_cfg") if isinstance(model_meta.get("model_cfg"), dict) else {}
+    feature_names = model_cfg.get("feature_names") or cfg.model.get("feature_names", None)
+    if feature_names is not None:
+        feature_names = list(feature_names)
+    return {
+        "feature_names": feature_names,
+        "boundary_radius": int(boundary_radius),
+        "residual_snr_clip": float(model_cfg.get("residual_snr_clip", cfg.model.get("residual_snr_clip", 4.0))),
+    }
+
+
 @torch.inference_mode()
 def sliding_window_gate(
     features: torch.Tensor,
@@ -239,6 +252,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     device = torch.device(args.device)
     model, model_meta = load_gate(args.config, args.ckpt, args.weights, device)
+    feature_kwargs = gate_feature_kwargs(cfg, model_meta, boundary_radius=int(args.boundary_radius))
     args.out_dir.mkdir(parents=True, exist_ok=True)
     figures_dir = args.out_dir / "figures"
     figures_dir.mkdir(parents=True, exist_ok=True)
@@ -261,6 +275,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             initial[0],
             residual_mean[0],
             residual_std[0],
+            heart_mask[0],
+            **feature_kwargs,
         )
         features = feature_4d.unsqueeze(0)
         gate = sliding_window_gate(
@@ -364,6 +380,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "checkpoint": str(args.ckpt),
         "weights": args.weights,
         "model_meta": model_meta,
+        "feature_kwargs": feature_kwargs,
         "cache_dir": str(cache_dir),
         "roi_size": [args.roi_size, args.roi_size, args.roi_size],
         "overlap": args.overlap,

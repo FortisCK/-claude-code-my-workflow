@@ -32,6 +32,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from monai.utils import set_determinism
+from omegaconf import OmegaConf
 
 from code.evaluation.metrics import make_boundary_band  # noqa: E402
 from code.training.train_residual_gate import make_gate_features  # noqa: E402
@@ -39,6 +40,7 @@ from scripts.python.evaluate_residual_gate_full_volume import (  # noqa: E402
     DEFAULT_OVERLAP,
     DEFAULT_ROI_SIZE,
     DEFAULT_SIGMA_SCALE,
+    gate_feature_kwargs,
     load_cache,
     load_gate,
     sliding_window_gate,
@@ -260,7 +262,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     device = torch.device(args.device)
+    cfg = OmegaConf.load(args.config)
     model, model_meta = load_gate(args.config, args.ckpt, args.weights, device)
+    feature_kwargs = gate_feature_kwargs(cfg, model_meta, boundary_radius=int(args.boundary_radius))
     selection_rows: list[dict[str, object]] = []
     log.info("selected %d unique cases: %s", len(selected), list(selected.keys()))
 
@@ -276,7 +280,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         residual_std = data["residual_std"]
         heart_mask = data["heart_mask"]
         boundary_mask = make_boundary_band(heart_mask, radius=args.boundary_radius)
-        feature_4d = make_gate_features(corrupted[0], initial[0], residual_mean[0], residual_std[0])
+        feature_4d = make_gate_features(
+            corrupted[0],
+            initial[0],
+            residual_mean[0],
+            residual_std[0],
+            heart_mask[0],
+            **feature_kwargs,
+        )
         gate = sliding_window_gate(
             feature_4d.unsqueeze(0),
             model,
@@ -335,6 +346,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "checkpoint": str(args.ckpt),
         "weights": args.weights,
         "model_meta": model_meta,
+        "feature_kwargs": feature_kwargs,
         "cache_dir": str(args.cache_dir),
         "metrics_csv": str(args.metrics_csv),
         "out_dir": str(args.out_dir),

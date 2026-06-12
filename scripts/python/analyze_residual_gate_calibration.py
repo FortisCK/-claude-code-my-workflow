@@ -32,6 +32,7 @@ if str(REPO_ROOT) not in sys.path:
 import numpy as np
 import torch
 from monai.utils import set_determinism
+from omegaconf import OmegaConf
 
 from code.evaluation.metrics import make_boundary_band  # noqa: E402
 from code.training.train_residual_gate import make_gate_features  # noqa: E402
@@ -39,6 +40,7 @@ from scripts.python.evaluate_residual_gate_full_volume import (  # noqa: E402
     DEFAULT_OVERLAP,
     DEFAULT_ROI_SIZE,
     DEFAULT_SIGMA_SCALE,
+    gate_feature_kwargs,
     load_cache,
     load_gate,
     sliding_window_gate,
@@ -220,7 +222,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     metric_rows = _read_metric_rows(args.metrics_csv)
     args.out_dir.mkdir(parents=True, exist_ok=True)
     device = torch.device(args.device)
+    cfg = OmegaConf.load(args.config)
     model, model_meta = load_gate(args.config, args.ckpt, args.weights, device)
+    feature_kwargs = gate_feature_kwargs(cfg, model_meta, boundary_radius=int(args.boundary_radius))
 
     region_accum: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     bin_accum: dict[tuple[str, str, int], dict[str, float]] = defaultdict(lambda: defaultdict(float))
@@ -239,7 +243,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         heart_interior = torch.logical_and(heart_mask, torch.logical_not(boundary_mask))
         non_heart = torch.logical_not(heart_mask)
 
-        features = make_gate_features(corrupted[0], initial[0], residual_mean[0], residual_std[0]).unsqueeze(0)
+        features = make_gate_features(
+            corrupted[0],
+            initial[0],
+            residual_mean[0],
+            residual_std[0],
+            heart_mask[0],
+            **feature_kwargs,
+        ).unsqueeze(0)
         gate = sliding_window_gate(
             features,
             model,
@@ -364,6 +375,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         "checkpoint": str(args.ckpt),
         "weights": args.weights,
         "model_meta": model_meta,
+        "feature_kwargs": feature_kwargs,
         "cache_dir": str(args.cache_dir),
         "metrics_csv": str(args.metrics_csv) if args.metrics_csv else None,
         "selected_cases": [{"split": split, "case_id": case_id, "path": str(path)} for split, case_id, path in selected],
