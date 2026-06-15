@@ -1,0 +1,47 @@
+{
+  "data_root": "datasets",
+  "output_dir": "configs/task1/splits",
+  "total_samples": 28732,
+  "roles": {
+    "released_train": {
+      "count": 18758,
+      "collections": {
+        "animal_train": 4021,
+        "phantom_train": 14737
+      },
+      "domains": {
+        "animal": 4021,
+        "phantom": 14737
+      },
+      "case_id_sources": {
+        "unavailable_from_filename": 18758
+      }
+    },
+    "released_eval": {
+      "count": 4691,
+      "collections": {
+        "animal_test": 1006,
+        "phantom_test": 3685
+      },
+      "domains": {
+        "animal": 1006,
+        "phantom": 3685
+      },
+      "case_id_sources": {
+        "unavailable_from_filename": 4691
+      }
+    },
+    "human_holdout": {
+      "count": 5283,
+      "collections": {
+        "human_train": 5283
+      },
+      "domains": {
+        "human": 5283
+      },
+      "case_id_sources": {
+        "filename_before_img_marker": 5283
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "artifact_type": "task1_weight_checksum_manifest",
+  "created_at_utc": "2026-06-15T12:56:47.361843+00:00",
+  "repo_root": "/home/mingzhang/cathaction",
+  "weights": [
+    {
+      "mtime_utc": "2026-05-25T11:44:16.403930+00:00",
+      "path": "outputs/task1/smp_fpn_convnext_tiny_640_rescue_stable/best_checkpoint.pt",
+      "sha256": "a2c75d2a50b8c4b593cba090302befd9015451e630c672a8dd429c07494d2d6d",
+      "size_bytes": 119415381
+    },
+    {
+      "mtime_utc": "2026-05-22T11:21:45.166564+00:00",
+      "path": "outputs/task1/smp_unet_efficientnet_b3_512_shootout/best_checkpoint.pt",
+      "sha256": "508a7aa0ca04109688b30598a317e566dd446a280ffcabdf62d78f5a677b9b27",
+      "size_bytes": 53254411
+    },
+    {
+      "mtime_utc": "2026-05-28T02:46:00.795048+00:00",
+      "path": "outputs/task1/smp_fpn_convnextv2_base_512_stage4a/best_checkpoint.pt",
+      "sha256": "0ac83408ea8ebbe6b77db6dbed4d7e691e08503b356952240793b931cc2f896a",
+      "size_bytes": 359426041
+    },
+    {
+      "mtime_utc": "2026-05-27T10:51:17.846834+00:00",
+      "path": "outputs/task1/smp_fpn_convnext_small_512_stage4a/best_checkpoint.pt",
+      "sha256": "8ccf51175313a8ebfd716c080157ccf3b80fa8894517981f773e33084ecda889",
+      "size_bytes": 205972001
+    },
+    {
+      "mtime_utc": "2026-05-29T10:06:58.799592+00:00",
+      "path": "outputs/task1/smp_fpn_convnext_small_640_stage5/best_checkpoint.pt",
+      "sha256": "9887b2c89360aee5407e45eef298b16f5a7e5e996780eca41cb228c6074875c0",
+      "size_bytes": 206007009
+    },
+    {
+      "mtime_utc": "2026-05-30T14:04:28.529268+00:00",
+      "path": "outputs/task1/smp_fpn_convnext_small_640_cldice_stage6/best_checkpoint.pt",
+      "sha256": "b6fb21e6246bff70a0546c10ae4aa03ce9bd0676a0000efd5b39a20003d2dc54",
+      "size_bytes": 206007201
+    },
+    {
+      "mtime_utc": "2026-05-31T22:48:25.685808+00:00",
+      "path": "outputs/task1/smp_fpn_convnext_small_640_toolness_aux_stage7/best_checkpoint.pt",
+      "sha256": "0ca462fb60fcf75f8b6e11457d545a685ba4e5447a36c3e3e2e524053e83ec41",
+      "size_bytes": 206007713
+    }
+  ]
+}

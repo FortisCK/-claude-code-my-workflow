@@ -1,0 +1,20 @@
+name: cathaction-task1
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - pillow
+  - opencv
+  - pyyaml
+  - tqdm
+  - matplotlib
+  - scikit-learn
+  - pytest
+  - pytorch
+  - torchvision
+  - cpuonly

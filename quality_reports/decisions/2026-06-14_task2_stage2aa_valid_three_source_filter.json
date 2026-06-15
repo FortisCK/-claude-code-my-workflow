@@ -1,0 +1,39 @@
+{
+  "candidate_rows_after": 113535,
+  "candidate_rows_before": 206635,
+  "candidate_source_counts_after": {
+    "stage2x_class1": 46550,
+    "task1_geometry_rect": 46500,
+    "yolo_stage2l": 20485
+  },
+  "candidate_source_counts_before": {
+    "sequence_tip": 46550,
+    "stage2w_dense": 46550,
+    "stage2x_class1": 46550,
+    "task1_geometry_rect": 46500,
+    "yolo_stage2l": 20485
+  },
+  "input_candidates": "outputs/task2/stage2o_candidate_pool/stage2x_five_source_valid_top50/valid_combined_candidates.csv",
+  "input_predictions": "outputs/task2/stage2u_quality_ranker/stage2x_five_source_fullvalid_eval/valid_combined_eval_prediction_rows.csv",
+  "keep_sources": [
+    "stage2x_class1",
+    "task1_geometry_rect",
+    "yolo_stage2l"
+  ],
+  "output_candidates": "outputs/task2/stage2aa_source_matched/valid_combined_yologeom_stage2x_candidates.csv",
+  "output_predictions": "outputs/task2/stage2aa_source_matched/valid_combined_yologeom_stage2x_prediction_rows.csv",
+  "prediction_rows_after": 113535,
+  "prediction_rows_before": 206635,
+  "prediction_source_counts_after": {
+    "stage2x_class1": 46550,
+    "task1_geometry_rect": 46500,
+    "yolo_stage2l": 20485
+  },
+  "prediction_source_counts_before": {
+    "sequence_tip": 46550,
+    "stage2w_dense": 46550,
+    "stage2x_class1": 46550,
+    "task1_geometry_rect": 46500,
+    "yolo_stage2l": 20485
+  }
+}

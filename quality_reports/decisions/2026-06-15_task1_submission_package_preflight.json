@@ -1,0 +1,203 @@
+{
+  "artifact_type": "task1_submission_package_preflight",
+  "checks": [
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "scripts/task1/run_task1_submission_inference.py",
+      "required": true,
+      "size_bytes": 10146,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "scripts/task1/predict_tta_ensemble_original_space.py",
+      "required": true,
+      "size_bytes": 8589,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "scripts/task1/apply_morphology_postprocess.py",
+      "required": true,
+      "size_bytes": 4376,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "configs/task1/smp_fpn_convnext_tiny_640_rescue_stable.yaml",
+      "required": true,
+      "size_bytes": 1263,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "configs/task1/smp_unet_efficientnet_b3_512_shootout.yaml",
+      "required": true,
+      "size_bytes": 1175,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "configs/task1/smp_fpn_convnextv2_base_512_stage4a.yaml",
+      "required": true,
+      "size_bytes": 1253,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "configs/task1/smp_fpn_convnext_small_512_stage4a.yaml",
+      "required": true,
+      "size_bytes": 1250,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "configs/task1/smp_fpn_convnext_small_640_stage5.yaml",
+      "required": true,
+      "size_bytes": 1252,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "configs/task1/smp_fpn_convnext_small_640_cldice_stage6.yaml",
+      "required": true,
+      "size_bytes": 1406,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "file",
+      "path": "configs/task1/smp_fpn_convnext_small_640_toolness_aux_stage7.yaml",
+      "required": true,
+      "size_bytes": 1396,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "weight_file",
+      "path": "outputs/task1/smp_fpn_convnext_tiny_640_rescue_stable/best_checkpoint.pt",
+      "required": true,
+      "size_bytes": 119415381,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "weight_file",
+      "path": "outputs/task1/smp_unet_efficientnet_b3_512_shootout/best_checkpoint.pt",
+      "required": true,
+      "size_bytes": 53254411,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "weight_file",
+      "path": "outputs/task1/smp_fpn_convnextv2_base_512_stage4a/best_checkpoint.pt",
+      "required": true,
+      "size_bytes": 359426041,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "weight_file",
+      "path": "outputs/task1/smp_fpn_convnext_small_512_stage4a/best_checkpoint.pt",
+      "required": true,
+      "size_bytes": 205972001,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "weight_file",
+      "path": "outputs/task1/smp_fpn_convnext_small_640_stage5/best_checkpoint.pt",
+      "required": true,
+      "size_bytes": 206007009,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "weight_file",
+      "path": "outputs/task1/smp_fpn_convnext_small_640_cldice_stage6/best_checkpoint.pt",
+      "required": true,
+      "size_bytes": 206007201,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "weight_file",
+      "path": "outputs/task1/smp_fpn_convnext_small_640_toolness_aux_stage7/best_checkpoint.pt",
+      "required": true,
+      "size_bytes": 206007713,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "image_dir",
+      "path": "/tmp/task1_hidden_smoke",
+      "required": true,
+      "size_bytes": null,
+      "valid": true
+    },
+    {
+      "exists": true,
+      "kind": "output_dir_creatable",
+      "path": "/tmp/task1_sub_out",
+      "required": true,
+      "size_bytes": null,
+      "valid": true
+    }
+  ],
+  "checksum_checks": [
+    {
+      "path": "outputs/task1/smp_fpn_convnext_tiny_640_rescue_stable/best_checkpoint.pt",
+      "sha256_match": true,
+      "size_match": true,
+      "valid": true
+    },
+    {
+      "path": "outputs/task1/smp_unet_efficientnet_b3_512_shootout/best_checkpoint.pt",
+      "sha256_match": true,
+      "size_match": true,
+      "valid": true
+    },
+    {
+      "path": "outputs/task1/smp_fpn_convnextv2_base_512_stage4a/best_checkpoint.pt",
+      "sha256_match": true,
+      "size_match": true,
+      "valid": true
+    },
+    {
+      "path": "outputs/task1/smp_fpn_convnext_small_512_stage4a/best_checkpoint.pt",
+      "sha256_match": true,
+      "size_match": true,
+      "valid": true
+    },
+    {
+      "path": "outputs/task1/smp_fpn_convnext_small_640_stage5/best_checkpoint.pt",
+      "sha256_match": true,
+      "size_match": true,
+      "valid": true
+    },
+    {
+      "path": "outputs/task1/smp_fpn_convnext_small_640_cldice_stage6/best_checkpoint.pt",
+      "sha256_match": true,
+      "size_match": true,
+      "valid": true
+    },
+    {
+      "path": "outputs/task1/smp_fpn_convnext_small_640_toolness_aux_stage7/best_checkpoint.pt",
+      "sha256_match": true,
+      "size_match": true,
+      "valid": true
+    }
+  ],
+  "failure_count": 0,
+  "failures": []
+}

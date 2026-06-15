@@ -1,0 +1,70 @@
+name: task1_smp_fpn_convnext_small_512_binary_hardneg_stage9d
+seed: 20260603
+
+paths:
+  repo_root: .
+  train_manifest: configs/task1/splits/released_train.csv
+  eval_manifest: configs/task1/splits/released_eval_balanced_1024.csv
+  output_dir: outputs/task1/smp_fpn_convnext_small_512_binary_hardneg_stage9d
+
+data:
+  image_size: [512, 512]
+  resize_mode: aspect_pad
+  label_mode: binary_foreground
+  threshold: 0.65
+  max_train_samples: null
+  max_eval_samples: null
+  max_predict_samples: 64
+  patch_sampling:
+    enabled: true
+    crop_size: [512, 512]
+    foreground_prob: 0.65
+    hard_negative_prob: 0.30
+    hard_negative_prediction_manifest: outputs/task1/stage9d_train_coarse_stage7_hflip/predictions.csv
+    hard_negative_dilate_radius: 3
+    min_hard_negative_pixels: 4
+    center_jitter_pixels: 96
+    max_attempts: 32
+    min_foreground_pixels: 12
+  normalization:
+    enabled: true
+    preset: imagenet
+  augmentation:
+    enabled: true
+    horizontal_flip_prob: 0.5
+    affine_prob: 0.35
+    rotate_range: 0.04
+    translate_pixels: 16
+    scale_range: 0.04
+    gaussian_noise_prob: 0.15
+    gaussian_noise_std: 0.01
+
+model:
+  name: smp
+  architecture: FPN
+  encoder_name: tu-convnext_small
+  encoder_weights: imagenet
+  in_channels: 3
+  out_channels: 1
+  kwargs: {}
+
+loss:
+  name: binary_dice_bce
+  lambda_dice: 1.0
+  lambda_bce: 0.7
+  pos_weight: 1.0
+
+training:
+  device: cuda
+  epochs: 60
+  batch_size: 8
+  num_workers: 8
+  learning_rate: 0.00008
+  weight_decay: 0.05
+  log_interval: 25
+  monitor_metric: eval.dice
+  monitor_mode: max
+  use_amp: false
+  gradient_clip_norm: 1.0
+  sampling:
+    domain_balanced: true

@@ -1,0 +1,25 @@
+{
+  "artifact_type": "task2_weight_checksum_manifest",
+  "created_at_utc": "2026-06-14T14:05:54.944886+00:00",
+  "repo_root": "/home/mingzhang/cathaction",
+  "weights": [
+    {
+      "mtime_utc": "2026-06-10T15:21:18.713874+00:00",
+      "path": "outputs/task2/yolo_stage2l_proposal/yolo11s_1024_agnostic_train_v0_v1_val_v2_combined_bal_e20/weights/best.pt",
+      "sha256": "b21e7b483485155641924df30304c43df21b9dae1bb6b212cd5fdc1d1d39af85",
+      "size_bytes": 19255962
+    },
+    {
+      "mtime_utc": "2026-06-13T20:52:21.577676+00:00",
+      "path": "outputs/task2/sequence_tip_localizer/stage2x_class1_tip384_convnext_centernet_coord20_e8/checkpoints/best.pt",
+      "sha256": "c6490dfc991afe5943fdbb6f915421b0f25738a48ae61b786b308fa1e9cf81b4",
+      "size_bytes": 358019609
+    },
+    {
+      "mtime_utc": "2026-06-12T14:41:58.690895+00:00",
+      "path": "outputs/task2/stage2u_quality_ranker/stage2u_warm_stage2o_fulltrain_valid512_e6/checkpoints/best.pt",
+      "sha256": "138b382650220972f06e7644f081a5240d8c8ec9b9e70050e655257ccb39d22c",
+      "size_bytes": 334124917
+    }
+  ]
+}

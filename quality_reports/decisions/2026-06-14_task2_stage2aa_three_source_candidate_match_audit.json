@@ -1,0 +1,115 @@
+{
+  "common_sources": [
+    "stage2x_class1",
+    "task1_geometry_rect",
+    "yolo_stage2l"
+  ],
+  "source_set_match": true,
+  "train_candidates": {
+    "fields": [
+      "split",
+      "sample_id",
+      "video_id",
+      "frame_index",
+      "domain",
+      "image_path",
+      "label_path",
+      "image_width",
+      "image_height",
+      "gt_class",
+      "gt_x1",
+      "gt_y1",
+      "gt_x2",
+      "gt_y2",
+      "source",
+      "source_priority",
+      "source_rank",
+      "source_conf",
+      "source_class",
+      "source_subtype",
+      "candidate_x1",
+      "candidate_y1",
+      "candidate_x2",
+      "candidate_y2",
+      "candidate_cx",
+      "candidate_cy",
+      "candidate_width",
+      "candidate_height",
+      "candidate_iou",
+      "matched_gt",
+      "verifier_label",
+      "verifier_label_name"
+    ],
+    "path": "outputs/task2/stage2o_candidate_pool/stage2x_train_subset_yolo_geometry_stage2x_top50/valid_combined_candidates.csv",
+    "rows": 278006,
+    "samples": 2291,
+    "sources": {
+      "stage2x_class1": 114550,
+      "task1_geometry_rect": 114500,
+      "yolo_stage2l": 48956
+    }
+  },
+  "train_only_sources": [],
+  "train_prediction_alignment": null,
+  "valid_candidates": {
+    "fields": [
+      "split",
+      "sample_id",
+      "video_id",
+      "frame_index",
+      "domain",
+      "image_path",
+      "label_path",
+      "image_width",
+      "image_height",
+      "gt_class",
+      "gt_x1",
+      "gt_y1",
+      "gt_x2",
+      "gt_y2",
+      "source",
+      "source_priority",
+      "source_rank",
+      "source_conf",
+      "source_class",
+      "source_subtype",
+      "candidate_x1",
+      "candidate_y1",
+      "candidate_x2",
+      "candidate_y2",
+      "candidate_cx",
+      "candidate_cy",
+      "candidate_width",
+      "candidate_height",
+      "candidate_iou",
+      "matched_gt",
+      "verifier_label",
+      "verifier_label_name"
+    ],
+    "path": "outputs/task2/stage2aa_source_matched/valid_combined_yologeom_stage2x_candidates.csv",
+    "rows": 113535,
+    "samples": 931,
+    "sources": {
+      "stage2x_class1": 46550,
+      "task1_geometry_rect": 46500,
+      "yolo_stage2l": 20485
+    }
+  },
+  "valid_only_sources": [],
+  "valid_prediction_alignment": {
+    "candidate_rows": 113535,
+    "candidate_sources": {
+      "stage2x_class1": 46550,
+      "task1_geometry_rect": 46500,
+      "yolo_stage2l": 20485
+    },
+    "prediction_rows": 113535,
+    "prediction_sources": {
+      "stage2x_class1": 46550,
+      "task1_geometry_rect": 46500,
+      "yolo_stage2l": 20485
+    },
+    "row_count_match": true,
+    "source_set_match": true
+  }
+}

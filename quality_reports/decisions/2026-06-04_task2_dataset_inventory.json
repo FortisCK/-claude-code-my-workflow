@@ -1,0 +1,261 @@
+{
+  "data_root": "datasets/collision_detection",
+  "images": 46506,
+  "labels": 46506,
+  "indexed_samples": 46506,
+  "all_samples": {
+    "samples": 46506,
+    "class_counts": {
+      "0": 28369,
+      "1": 18137
+    },
+    "videos": 36,
+    "top_videos": [
+      {
+        "video_id": "video_0",
+        "samples": 11029
+      },
+      {
+        "video_id": "video_32",
+        "samples": 3442
+      },
+      {
+        "video_id": "video_9",
+        "samples": 2897
+      },
+      {
+        "video_id": "video_3",
+        "samples": 2789
+      },
+      {
+        "video_id": "video_25",
+        "samples": 2665
+      },
+      {
+        "video_id": "video_23",
+        "samples": 1877
+      },
+      {
+        "video_id": "video_22",
+        "samples": 1836
+      },
+      {
+        "video_id": "video_24",
+        "samples": 1573
+      },
+      {
+        "video_id": "video_10",
+        "samples": 1564
+      },
+      {
+        "video_id": "video_11",
+        "samples": 1459
+      }
+    ],
+    "bbox": {
+      "width": {
+        "min": 0.013821138211382278,
+        "p25": 0.026220614828209764,
+        "median": 0.032956381260097076,
+        "p75": 0.03974706413730804,
+        "max": 0.13843648208469092
+      },
+      "height": {
+        "min": 0.018127962085307935,
+        "p25": 0.039192399049881234,
+        "median": 0.05061124694376511,
+        "p75": 0.06043165467625897,
+        "max": 0.2078239608801956
+      },
+      "area": {
+        "min": 0.00025100255195042054,
+        "p25": 0.001031011893650215,
+        "median": 0.0017165650674717259,
+        "p75": 0.002293669313412374,
+        "max": 0.028770418037160708
+      }
+    }
+  },
+  "split_summaries": {
+    "train_phantom.txt": {
+      "samples": 35788,
+      "class_counts": {
+        "0": 18298,
+        "1": 17490
+      },
+      "videos": 33,
+      "top_videos": [
+        {
+          "video_id": "video_32",
+          "samples": 3442
+        },
+        {
+          "video_id": "video_9",
+          "samples": 2897
+        },
+        {
+          "video_id": "video_3",
+          "samples": 2789
+        },
+        {
+          "video_id": "video_25",
+          "samples": 2665
+        },
+        {
+          "video_id": "video_23",
+          "samples": 1877
+        },
+        {
+          "video_id": "video_22",
+          "samples": 1836
+        },
+        {
+          "video_id": "video_24",
+          "samples": 1573
+        },
+        {
+          "video_id": "video_10",
+          "samples": 1564
+        },
+        {
+          "video_id": "video_11",
+          "samples": 1459
+        },
+        {
+          "video_id": "video_31",
+          "samples": 1459
+        }
+      ],
+      "bbox": {
+        "width": {
+          "min": 0.013821138211382278,
+          "p25": 0.02665589660743134,
+          "median": 0.032770270270270165,
+          "p75": 0.03853658536585299,
+          "max": 0.13843648208469092
+        },
+        "height": {
+          "min": 0.018127962085307935,
+          "p25": 0.040380047505938245,
+          "median": 0.05220588235294107,
+          "p75": 0.06303030303030312,
+          "max": 0.2078239608801956
+        },
+        "area": {
+          "min": 0.00025100255195042054,
+          "p25": 0.001099594953890028,
+          "median": 0.0017222996801443404,
+          "p75": 0.0023634169488347943,
+          "max": 0.028770418037160708
+        }
+      }
+    },
+    "valid_phantom.txt": {
+      "samples": 11024,
+      "class_counts": {
+        "0": 10612,
+        "1": 412
+      },
+      "videos": 1,
+      "top_videos": [
+        {
+          "video_id": "video_0",
+          "samples": 11024
+        }
+      ],
+      "bbox": {
+        "width": {
+          "min": 0.013821138211382278,
+          "p25": 0.018970189701897018,
+          "median": 0.03432700993676603,
+          "p75": 0.039783001808318265,
+          "max": 0.051537070524412504
+        },
+        "height": {
+          "min": 0.018127962085307935,
+          "p25": 0.024940617577197084,
+          "median": 0.04513064133016641,
+          "p75": 0.052256532066508175,
+          "max": 0.06769596199524941
+        },
+        "area": {
+          "min": 0.00025100255195042054,
+          "p25": 0.00047312824672189586,
+          "median": 0.0015491999733932417,
+          "p75": 0.0020770437316408002,
+          "max": 0.0034888515675671173
+        }
+      }
+    },
+    "valid_animal.txt": {
+      "samples": 398,
+      "class_counts": {
+        "0": 126,
+        "1": 272
+      },
+      "videos": 3,
+      "top_videos": [
+        {
+          "video_id": "video_1_animal",
+          "samples": 183
+        },
+        {
+          "video_id": "video_0_animal",
+          "samples": 108
+        },
+        {
+          "video_id": "video_2_animal",
+          "samples": 107
+        }
+      ],
+      "bbox": {
+        "width": {
+          "min": 0.03125,
+          "p25": 0.044921875,
+          "median": 0.05859375,
+          "p75": 0.072265625,
+          "max": 0.08203125
+        },
+        "height": {
+          "min": 0.064453125,
+          "p25": 0.068359375,
+          "median": 0.09765625,
+          "p75": 0.11328125,
+          "max": 0.13671875
+        },
+        "area": {
+          "min": 0.00276947021484375,
+          "p25": 0.003070831298828125,
+          "median": 0.00705718994140625,
+          "p75": 0.00705718994140625,
+          "max": 0.008697509765625
+        }
+      }
+    }
+  },
+  "split_overlap": {
+    "train_phantom.txt__valid_animal.txt": {
+      "count": 0,
+      "examples": []
+    },
+    "train_phantom.txt__valid_phantom.txt": {
+      "count": 704,
+      "examples": [
+        "video_0_00000002.txt",
+        "video_0_00000004.txt",
+        "video_0_00000005.txt",
+        "video_0_00000006.txt",
+        "video_0_00000007.txt",
+        "video_0_00000008.txt",
+        "video_0_00000010.txt",
+        "video_0_00000011.txt",
+        "video_0_00000012.txt",
+        "video_0_00000013.txt"
+      ]
+    },
+    "valid_animal.txt__valid_phantom.txt": {
+      "count": 0,
+      "examples": []
+    }
+  }
+}

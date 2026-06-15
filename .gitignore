@@ -55,12 +55,33 @@ CLAUDE.local.md
 # Quarto rendering artifacts
 .quarto/
 
+# Local challenge datasets (large; download separately, do not commit)
+datasets/*
+!datasets/README.md
+!datasets/.gitkeep
+
 # quality_reports/ stores CATHACTION plans, specs, session logs, decisions,
 # checkpoints, and review reports. In this project repo those files are part of
 # the durable collaboration record, so they are intentionally trackable.
 
 # R analysis outputs (generated artifacts; keep scripts, ignore outputs)
 scripts/R/_outputs/
+
+# Generated Task 2 split lists + YOLO data yamls. These contain machine-specific
+# ABSOLUTE paths (INV-18) and are reproducible via scripts/task2/prepare_*_splits.py
+# (verify with scripts/task2/audit_split_disjointness.py). Do not commit.
+configs/task2/splits/
+configs/task2/splits_*/
+configs/task2/*.local.yaml
+
+# Experiment outputs and model checkpoints
+outputs/
+*.pt
+*.pth
+*.ckpt
+
+# Third-party repositories cloned for implementation/reference checks
+external_repos/
 
 # Output artifacts — uncomment lines below based on your preference
 # *.rds

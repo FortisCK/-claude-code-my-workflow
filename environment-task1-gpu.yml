@@ -1,0 +1,26 @@
+name: cathaction-task1-gpu
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pandas
+  - scipy
+  - pillow
+  - opencv
+  - pyyaml
+  - tqdm
+  - matplotlib
+  - scikit-learn
+  - pytest
+  - pytorch
+  - torchvision
+  - pytorch-cuda=12.1
+  - pip:
+      - monai>=1.5
+      - timm>=1.0
+      - segmentation-models-pytorch>=0.5
+      - transformers>=4.41

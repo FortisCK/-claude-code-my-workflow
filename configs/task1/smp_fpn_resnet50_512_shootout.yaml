@@ -1,0 +1,55 @@
+name: task1_smp_fpn_resnet50_512_shootout
+seed: 20260521
+
+paths:
+  repo_root: .
+  train_manifest: configs/task1/splits/released_train.csv
+  eval_manifest: configs/task1/splits/released_eval_balanced_1024.csv
+  output_dir: outputs/task1/smp_fpn_resnet50_512_shootout
+
+data:
+  image_size: [512, 512]
+  resize_mode: direct
+  label_mode: multiclass_012
+  threshold: 0.5
+  max_train_samples: null
+  max_eval_samples: null
+  max_predict_samples: 64
+  augmentation:
+    enabled: true
+    horizontal_flip_prob: 0.5
+    affine_prob: 0.35
+    rotate_range: 0.04
+    translate_pixels: 12
+    scale_range: 0.04
+    gaussian_noise_prob: 0.15
+    gaussian_noise_std: 0.01
+
+model:
+  name: smp
+  architecture: FPN
+  encoder_name: resnet50
+  encoder_weights: imagenet
+  in_channels: 3
+  out_channels: 3
+  kwargs: {}
+
+loss:
+  name: monai_dice_ce
+  include_background: true
+  class_weights: [0.02, 1.0, 2.0]
+  lambda_dice: 1.0
+  lambda_ce: 0.5
+  label_smoothing: 0.0
+
+training:
+  device: cuda
+  epochs: 50
+  batch_size: 16
+  num_workers: 8
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  log_interval: 25
+  monitor_metric: eval.dice
+  monitor_mode: max
+  use_amp: true
