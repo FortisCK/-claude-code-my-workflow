@@ -208,19 +208,28 @@ Archived skills (Beamer / Quarto / R-pipeline / TikZ-aware): see
 
 ## Current project state
 
-| Artefact slot                | Status        | Notes                                                                  |
-| ---------------------------- | ------------- | ---------------------------------------------------------------------- |
-| Workflow configuration       | **Active**    | This adaptation, 2026-04-29 — plan `wondrous-honking-gray.md`          |
-| Bibliography (anchor refs)   | Seeded        | 6 entries (TT U-Net, HM-EDM, ProDM, C2F-MC, DPS, baselines)            |
-| ImageCAS preprocessing       | Not started   | First task once data is downloaded                                     |
-| 3D KL-VAE checkpoint         | Not started   | Planned May 2026                                                       |
-| Conditional latent denoiser  | Not started   | Planned June–July 2026                                                 |
-| Posterior sampling pipeline  | Not started   | Planned August 2026                                                    |
-| Downstream-task evaluation   | Not started   | Planned September 2026                                                 |
-| Manuscript: MICCAI 2027      | Not started   | First draft November 2026                                              |
-| Manuscript: CVPR 2027        | Not started   | Parallel draft if pacing allows                                        |
+_Last refreshed: 2026-06-15 (was badly stale — every model below was marked
+"Not started" while in fact trained & evaluated). Headline numbers are test100,
+full-volume; see the cited run cards for provenance._
 
-The full timeline lives in
+| Artefact slot                       | Status            | Notes                                                                                          |
+| ----------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------- |
+| Workflow configuration              | **Active**        | This adaptation, 2026-04-29 — plan `wondrous-honking-gray.md`                                   |
+| Bibliography (anchor refs)          | Seeded            | 6 entries (TT U-Net, HM-EDM, ProDM, C2F-MC, DPS, baselines)                                     |
+| ImageCAS preprocessing + motion sim | **Done**          | 1000 cases → `processed/v1`; parametric DVF (tomosipo+ASTRA), 2 motion variants/case            |
+| 3D KL-VAE (Stage-1)                 | **Done / frozen** | `vae_v2/best_val.pt` @ epoch445; test recon MAE 22.9 HU, SSIM 0.959 (`2026-05-17_1658`)         |
+| Conditional latent denoiser (diff v1)| **Done / frozen** | `diffusion_v1/epoch_200.pt`; test100 MAE **72.94 HU** — **loses to U-Net** (`2026-05-19_1600`)  |
+| Supervised U-Net baseline           | **Done / frozen** | `unet_v1/epoch_200.pt`; test100 MAE **38.07 HU**, PSNR 33.23, SSIM 0.945 (`2026-05-19_1511`)    |
+| Reliability-gated residual diffusion| **Active line**   | v1 gate e060 KEEP: test100 -0.076 HU vs U-Net, 100/100 (`2026-06-11_1058`); **v3a eval pending**|
+| Posterior sampling pipeline         | Implemented       | latent + residual posterior (mean+std) coded; **UQ calibration (ECE/coverage) not yet computed**|
+| Downstream-task evaluation          | Partial           | artifact-aware metrics (heart/boundary/severity) Done; **lumen/Dice downstream still a STUB**   |
+| Manuscript: CVPR/MICCAI 2027        | Not started       | venue call deferred; gate win judged "too small to be the standalone story"                     |
+
+Active technical line is the **3-layer frozen cascade**: U-Net initializer →
+residual-EDM posterior (mean+std) → learned `ResidualGateNet3D` releasing
+`x_final = x_u + g·μ_r` (g ≤ 0.25). See
+[`quality_reports/plans/reliability-gated-posterior-residual-diffusion.md`](quality_reports/plans/reliability-gated-posterior-residual-diffusion.md).
+The original strategic timeline lives in
 [`quality_reports/decisions/2026-04-29_research-direction-v2.md`](quality_reports/decisions/2026-04-29_research-direction-v2.md) §09.
 
 ---

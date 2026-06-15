@@ -352,6 +352,44 @@ CVPR fallback is not a failure mode. It gives time to strengthen visual results,
   are tiny, so useful residual corrections are local and require a fine-grained
   learned gate. Run card:
   `experiments/runs/2026-05-21_1651_diffusion-v2-residual-gate-test5.md`.
+- 2026-05-22: Implemented and trained the learned reliability gate
+  (`residual_gate_v1`): `ResidualGateNet3D` releasing `x_final = x_u + g·μ_r`
+  with `g ≤ 0.25`, trained on cached posterior features. train100 epoch20 beat
+  all fixed alphas; resuming to epoch60 improved monotonically (test5 -0.0746,
+  val20 -0.0775 HU, 20/20 cases). Two oracle-supervised variants were
+  DISCARDed: dense BCE oracle regressed to +0.014 HU (worse than U-Net), sparse
+  oracle reached -0.007 HU (better than U-Net but worse than v1). Lesson:
+  per-voxel oracle matching over-releases; v1's conservative final-image loss is
+  the anchor. Run cards: `2026-05-22_1711_residual-gate-v1-train100-e060-test5-val20.md`,
+  `2026-05-22_1301`, `2026-05-22_1322`.
+- 2026-06-10/11: Evaluated `residual_gate_v1/train100_e060/epoch_060.pt` on the
+  full held-out **test100**. Result KEEP: global MAE -0.0762 HU vs frozen U-Net,
+  heart -0.6535, boundary -0.7219, boundary-grad -0.2275, **100/100 cases
+  improved on all four metrics**, gains grow with severity. Direct posterior
+  mean residual is much worse (49.55 HU), confirming the gate is necessary.
+  Calibration analysis confirmed the gate is genuinely calibrated (high gate →
+  monotonically higher improvement) but the global gain is diluted because ~55%
+  of (non-heart) voxels are suppressed. This satisfied the Step-3 Go/No-Go but
+  the win is "too small to be the standalone paper story." Run cards:
+  `2026-06-11_1058_residual-gate-v1-e060-test100.md`,
+  `2026-06-11_1615_residual-gate-v1-test100-calibration.md`.
+- 2026-06-13: Trained `residual_gate_v3a` to epoch60 — the v1 gate plus three
+  structure/reliability input channels recommended by the calibration analysis
+  (`heart_mask`, `boundary_band`, `residual_snr = |μ_r|/σ_r`; 9ch total), same
+  conservative v1 loss and `g_max=0.25`. Config
+  `code/training/configs/residual_gate_v3a.yaml`.
+- 2026-06-15: Launched the v3a evaluation (val20 + full test100, reusing the v1
+  posterior caches — no diffusion re-sampling) to close the open loop, since
+  v3a had been trained but never evaluated. Run card:
+  `experiments/runs/2026-06-15_1511_residual-gate-v3a-e060-test100.md`.
+  **Verdict: DISCARD.** v3a is 100/100-consistent but does not beat v1: test100
+  global MAE Δ -0.0662 (v1 -0.0762), heart Δ -0.5624 (v1 -0.6535), boundary tie,
+  and only boundary-gradient L1 clearly better (-0.327 vs -0.228). Gate mean
+  actually dropped (0.0067 vs 0.0076) despite the heart_mask input. The
+  added-channels hypothesis is falsified at this budget: the conservative v1 loss
+  gives the gate no reason to exploit the new channels. `residual_gate_v1` remains
+  the anchor. Next model step should be **v3b** (v3a inputs + a weak sparse
+  high-confidence oracle auxiliary loss), not more inputs.
 
 ## Non-Goals For The Next Sprint
 

@@ -151,3 +151,19 @@ LTSI session 不需要重新 onboard — 上面这些文档 self-contained 描�
 [LEARN:arch] **Latent shape 实际是 192³ → 24³ × 4ch**(8x spatial compression),不是 spec v1.1 说的 256³ → 32×32×16。差别:(a) volume crop 到 192³ 围绕 heart bbox,不是全 256³;(b) latent 8x per-axis compression 是 MONAI default;(c) 4 channel 不是 16。Why: 192³ 是 heart bbox + 30mm pad 的实际大小;4ch latent 在 MONAI AutoencoderKL default,够用且参数少。How to apply: spec §计算预算 & 架构 update;Success Criteria 数字 target 不变(VAE 重建 RMSE 等指标在 192³ 上同样适用)。
 
 [LEARN:framework] **EDM (Karras 2022) over DDPM**。从 HM-EDM `conditional_EDM_3D.py` ported,移除 lucidrains UNet 依赖,wrap MONAI `DiffusionModelUNet`。50-step Heun sampling 比 DDPM 1000-step 快 30 倍 → N=16 posterior 采样可行。Why: spec v1.1 没显式 lock framework choice;LTSI 实际选 EDM 是合理的(precedent + speed)。How to apply: spec §三个 Novelty 主张 #1 措辞精化加 "EDM-based",论文方法节明确写 EDM motivation。
+
+## Stage-2 结果与路线转折 (2026-05-15 → 06-13 LTSI session)
+
+> 这批条目补回 MEMORY.md 此前 6 周的缺口(2026-05-01 之后无 [LEARN])。详见 `experiments/runs/` 各 run card 与 `quality_reports/plans/reliability-gated-posterior-residual-diffusion.md`。
+
+[LEARN:result] **监督 U-Net 作为点估计器全面击败 conditional latent diffusion**。test100 整卷:U-Net v1 (epoch200 EMA) MAE **38.07 HU** vs latent diffusion v1 (det 50-step) **72.94 HU**(约 1.9× 误差),heart/boundary/PSNR/SSIM 全面更优(`2026-05-19_1511`, `2026-05-19_1600`)。Why: 配对 HU-preserving restoration 里 supervised U-Net ≈ conditional-mean estimator,这是 latent-diffusion 在该类任务的经典困境。How to apply: 论文 diffusion 卖点必须重定位到 **posterior-sampling 不确定性 + reliability gating**,**不能**主张「diffusion 点估计更准」;`research-direction-v2` §07 novelty #1 措辞需相应收敛。
+
+[LEARN:method] **路线转折:Reliability-Gated Posterior Residual Diffusion**(三层冻结级联)。`x_u = U-Net(corrupted)` → 冻结 residual-EDM 采 K 个残差 → `μ_r,σ_r` → 学习 GateNet `g` → `x_final = x_u + g·μ_r`(`g ≤ g_max=0.25`, `init_bias=-4.0` 初始保守)。Why: 直接把 posterior mean 残差加回去会过校正(test100 反而恶化到 49.55 HU);有用的修正信号高度局部,需要逐体素 reliability gate(`2026-05-21_1651` voxel-oracle 上限仅 -3.34 HU,block/scalar gate 几乎无效)。How to apply: 这是当前活跃主线;新实验都在 gate 之上做,不要重训 ungated 直加残差的版本。
+
+[LEARN:result] **gate 校准良好,但全局增益被心脏外体素稀释**。v1 gate e060 test100:全局 MAE -0.076 HU 但 **100/100 例全改善**;heart -0.65 HU,boundary -0.72 HU,增益随伪影严重度上升(`2026-06-11_1058`)。calibration 显示高 gate 值→高改善单调成立(boundary gate≥0.2 → +2.97 HU),但 ~55% 体素(心脏外)gate<0.001 被抑制,non-heart 区仅 +0.031 HU(`2026-06-11_1615`)。How to apply: v3a 因此新增 `heart_mask + boundary_band + residual_snr=|μ_r|/σ_r` 三通道输入(9ch),把容量集中到心脏/边界;run card 自承「全局增益太小,不足以单独支撑论文级 performance story」→ 需并行做更强 deterministic 基线或把心脏区增益做大。
+
+[LEARN:method] **oracle 监督 gate 反而更差,v1 的保守 final-image loss 是锚**。dense per-voxel oracle BCE → test100 +0.014 HU(比 U-Net 还差);sparse oracle → -0.007 HU(比 v1 的 -0.038 差)(`2026-05-22_1301/1322`)。Why: per-voxel oracle 匹配会过校正、在 sliding-window 推理下不鲁棒。How to apply: 不要用 dense/sparse oracle BCE 作主损失;只在 v1 conservative loss 之上加「弱、稀疏、高置信」释放校准(即拟议的 v3b)。
+
+[LEARN:workflow] **gate 评估复用缓存的 posterior residual features,迭代极廉价**。`scripts/python/cache_residual_diffusion_features.py` 把 clean/corrupted/initial/μ_r/σ_r/heart_mask 落盘(`experiments/cache/residual_diffusion_features/`);`evaluate_residual_gate_full_volume.py` 从 config 的 `feature_names` 自动派生 boundary_band/residual_snr,无需改代码即可评估不同 gate 版本。Why: 那 ~4h 的 diffusion 采样只需做一次。How to apply: 评估新 gate(如 v3a/v3b)直接复用 `v1_test100`(test)与 `v1_train100_val20_test5`(val) cache,只花 ~1h gate 推理,不重跑采样。
+
+[LEARN:result] **v3a「加结构通道」假设被证伪——v1 仍是最好的 gate**。residual_gate_v3a(v1 + heart_mask + boundary_band + residual_snr,9ch,同 v1 保守损失,epoch60)在 test100 上 100/100 例全改善,但**没跑赢 v1**:全局 MAE Δ -0.066 vs v1 -0.076、heart Δ -0.562 vs v1 -0.654(都在噪声内但一致偏弱),boundary 打平,只有 boundary-gradient L1 明显更好(-0.327 vs -0.228);gate mean 反而更低(0.0067 vs 0.0076)。Why: 保守 v1 损失从不奖励「用这些新通道」,gate 没有信号去 exploit residual_snr/mask,只多了输入维度。How to apply: **不要再靠堆输入通道改善 gate**;下一步应是 v3b = v3a 输入 + 弱稀疏高置信 oracle 辅助损失(给 gate 一个用这些通道的理由),而非继续加输入。Run card `2026-06-15_1511_residual-gate-v3a-e060-test100.md`,Decision DISCARD。
