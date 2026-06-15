@@ -390,6 +390,25 @@ CVPR fallback is not a failure mode. It gives time to strengthen visual results,
   gives the gate no reason to exploit the new channels. `residual_gate_v1` remains
   the anchor. Next model step should be **v3b** (v3a inputs + a weak sparse
   high-confidence oracle auxiliary loss), not more inputs.
+- 2026-06-15: Trained the residual diffusion to convergence (80 epochs) — the
+  long run the pilot card deferred until the gate existed. The diffusion that fed
+  every gate experiment had only been a 5-epoch pilot. **Diagnostic verdict:
+  performance via refinement is structurally capped.** Ungated test5 posterior
+  mean converged 61.75 → 41.79 HU (now only +1.19 above U-Net) but never beats
+  U-Net, and critically the **voxel-oracle ceiling SHRANK** with convergence
+  (global -3.34 → -2.83, heart -5.09 → -3.81, boundary -4.90 → -4.38): a better
+  diffusion gives the gate *less* exploitable residual because the posterior mean
+  converges toward U-Net's conditional-mean estimate. Decision: KEEP the
+  converged checkpoint `diffusion_v2_residual/longrun/epoch_080.pt` (first
+  posterior with meaningful σ_r), but stop chasing accuracy via gate retraining.
+  **Pivot the paper spine to UQ (novelty #2) + downstream (novelty #3);** frame
+  performance honestly as "matches U-Net + small consistent gated gain + free
+  calibrated uncertainty," and write the "why diffusion refinement can't beat a
+  strong supervised U-Net (+ oracle-headroom characterization)" as a positive
+  contribution. Next concrete step: evaluate posterior-std calibration
+  (reliability diagram / ECE / coverage / uncertainty-error correlation) on the
+  converged checkpoint. Run card:
+  `experiments/runs/2026-06-15_1705_residual-diffusion-v2-longrun.md`.
 
 ## Non-Goals For The Next Sprint
 

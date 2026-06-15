@@ -37,12 +37,35 @@ posterior caches → ~1.5h, no diffusion re-sampling). Run card:
 - `MEMORY.md` +5 `[LEARN]` entries filling the 2026-05-01 → 06-13 gap.
 - `aaai-first-cvpr-fallback-roadmap.md` Progress Log extended through 2026-06-15.
 
-## Pending
+## Update — residual diffusion long run (the user pushed for a performance edge)
 
-- v3a val20 + test100 eval result → fill run card outcome + KEEP/DISCARD/ITERATE,
-  patch the v3a verdict line in MEMORY.md (if material) and the roadmap Progress Log.
-- commit the close-out (experiment + docs).
-- THEN discuss next steps with the user.
+User pushed back: a paper needs *some* performance advantage. Agreed, and found
+the elephant: the residual diffusion feeding every gate experiment was only a
+5-epoch pilot. Ran it to convergence (80 epochs, ~6h, concurrent with the user's
+cathaction RT-DETR job) as a decisive diagnostic with an explicit epoch-30
+early-stop gate.
+
+**Verdict: performance via refinement is structurally capped.** Ungated test5
+posterior mean converged 61.75 → 41.79 HU (only +1.19 above U-Net) but never
+beats it, and the voxel-oracle ceiling SHRANK (global -3.34 → -2.83, heart
+-5.09 → -3.81): a better diffusion gives the gate *less* exploitable residual,
+because the posterior mean converges toward U-Net's conditional mean. Decision:
+KEEP the converged checkpoint (`diffusion_v2_residual/longrun/epoch_080.pt`,
+first posterior with meaningful σ_r), stop chasing accuracy. Run card
+`2026-06-15_1705_residual-diffusion-v2-longrun.md`.
+
+## Pending / next
+
+- **Pivot to UQ (novelty #2):** evaluate posterior-std calibration (reliability
+  diagram / ECE / coverage / uncertainty-error correlation, artifact
+  localization) on the converged `epoch_080.pt`. This is the high-EV next step
+  and no longer depends on performance.
+- Downstream lumen (novelty #3): `dice_lumen` still a STUB.
+- Frame performance honestly: "matches U-Net + small consistent gated gain +
+  free calibrated uncertainty" + the "why refinement can't beat a strong
+  supervised U-Net" oracle-headroom characterization as a positive contribution.
+- (Optional, low-EV) one confirmatory gate retrain on the converged diffusion —
+  oracle already bounds it at ≈ v1; skip unless the user wants the empirical number.
 
 ## Open questions for next-step discussion (deferred)
 
