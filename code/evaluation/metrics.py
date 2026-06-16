@@ -119,6 +119,79 @@ def masked_gradient_l1(pred: torch.Tensor, target: torch.Tensor, mask: torch.Ten
     return masked_mean((gradient_magnitude(pred) - gradient_magnitude(target)).abs(), mask)
 
 
+# ------------------------------------------------------------------
+# Coronary-lumen metrics (real, GT-mask based — replaces dice_lumen stub
+# for the downstream-fidelity leg; see plan 2026-06-16_coronary-lumen-*).
+# Normalization matches preprocessing.py: HU [-1024, 3071] -> [-1, 1].
+# ------------------------------------------------------------------
+_HU_CLIP_LO: float = -1024.0
+_HU_CLIP_HI: float = 3071.0
+LUMEN_CONTRAST_HU: float = 200.0  # contrast-enhanced vessel threshold for lumen Dice
+
+
+def hu_to_norm(hu: float) -> float:
+    """Map an HU value to the preprocessing [-1, 1] normalized domain."""
+    return (hu - _HU_CLIP_LO) / (_HU_CLIP_HI - _HU_CLIP_LO) * 2.0 - 1.0
+
+
+def dilate_mask(mask: torch.Tensor, radius: int) -> torch.Tensor:
+    """Morphological dilation of a 3D binary mask by `radius` voxels."""
+    if radius < 1:
+        raise ValueError(f"radius must be >= 1, got {radius}")
+    if mask.dim() == 3:
+        ref = mask.unsqueeze(0).unsqueeze(0)
+    elif mask.dim() == 4:
+        ref = mask.unsqueeze(1)
+    else:
+        ref = mask
+    mask_bool = _as_bool_mask(mask, ref)
+    kernel = 2 * radius + 1
+    return F.max_pool3d(mask_bool.float(), kernel_size=kernel, stride=1, padding=radius) > 0.5
+
+
+def masked_sharpness(volume: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    """Mean gradient magnitude inside `mask` — an absolute sharpness measure.
+
+    A blurry (regression-to-mean) restoration has lower in-lumen gradient energy;
+    a sharp restoration recovers the clean volume's edge content.
+    """
+    return masked_mean(gradient_magnitude(volume), mask)
+
+
+def lumen_contrast(
+    volume: torch.Tensor, lumen_mask: torch.Tensor, ring_mask: torch.Tensor
+) -> torch.Tensor:
+    """Lumen-to-surround contrast: mean(volume|lumen) - mean(volume|ring).
+
+    `ring_mask` is the surrounding (e.g. dilated-minus-lumen) tissue band.
+    Higher contrast = better-preserved vessel against background.
+    """
+    return masked_mean(volume, lumen_mask) - masked_mean(volume, ring_mask)
+
+
+def dice_lumen_masked(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    region_mask: torch.Tensor,
+    hu_threshold: float = LUMEN_CONTRAST_HU,
+    eps: float = 1e-7,
+) -> torch.Tensor:
+    """Dice of high-contrast voxels (HU > threshold) within `region_mask`.
+
+    Unlike `dice_lumen` (global, arbitrary 0.5 threshold), this restricts the
+    comparison to a coronary-lumen neighborhood and uses a contrast-level HU
+    threshold, so it measures geometric recovery of the bright vessel relative
+    to the clean target — not background HU agreement.
+    """
+    thr = hu_to_norm(hu_threshold)
+    region = _as_bool_mask(region_mask, pred)
+    p_bin = ((pred > thr) & region).float()
+    t_bin = ((target > thr) & region).float()
+    intersect = (p_bin * t_bin).flatten(1).sum(dim=1)
+    union = p_bin.flatten(1).sum(dim=1) + t_bin.flatten(1).sum(dim=1)
+    return (2.0 * intersect + eps) / (union + eps)
+
+
 def psnr(pred: torch.Tensor, target: torch.Tensor, data_range: float = 2.0) -> torch.Tensor:
     """Peak-signal-to-noise ratio (dB), elementwise then per-sample mean.
 

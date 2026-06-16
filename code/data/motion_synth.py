@@ -305,6 +305,49 @@ def parametric_dvf(
     return d * motion_params.motion_strength * motion_weight.unsqueeze(-1)
 
 
+def make_random_smooth_dvf_fn(
+    seed: int,
+    peak_mm: float = 12.0,
+    n_ctrl: int = 5,
+):
+    """Factory: a structurally-DIFFERENT motion model for OOD generalization tests.
+
+    Returns a `dvf_fn` with the same signature as `parametric_dvf`, but the
+    spatial deformation has NO anatomical structure (no contraction / twist /
+    long-axis terms) — it is a smooth random field from a coarse seeded control
+    grid, trilinearly upsampled and rescaled to a fixed peak displacement. The
+    field is fixed in space and modulated over the cardiac cycle by the SAME
+    `time_profile` s(t), so it is a coherent cardiac-like deformation that the
+    parametric-trained model has never seen. Magnitude (`peak_mm`) is the knob to
+    severity-match against the parametric control, so an OOD drop isolates
+    "different motion MODEL" from "harder motion".
+
+    Args:
+        seed: RNG seed for the control grid (reproducible).
+        peak_mm: peak displacement magnitude (mm) of the static field.
+        n_ctrl: control-grid resolution per axis (low → smoother field).
+    """
+    cache: dict[tuple[int, int, int], torch.Tensor] = {}
+
+    def dvf_fn(grid_mm, motion_weight, anatomy, motion_params, t_ms):
+        device = grid_mm.device
+        z_size, y_size, x_size, _ = grid_mm.shape
+        key = (z_size, y_size, x_size)
+        if key not in cache:
+            gen = torch.Generator(device="cpu").manual_seed(seed)
+            ctrl = torch.randn(1, 3, n_ctrl, n_ctrl, n_ctrl, generator=gen)
+            d0 = F.interpolate(
+                ctrl, size=(z_size, y_size, x_size), mode="trilinear", align_corners=True
+            )[0].permute(1, 2, 3, 0)  # (Z, Y, X, 3)
+            mag = torch.linalg.norm(d0, dim=-1).max()
+            d0 = d0 / (mag + EPS_FP32) * peak_mm
+            cache[key] = d0.to(device)
+        s_t = time_profile(t_ms, motion_params.cardiac_period_ms)
+        return cache[key] * s_t * motion_params.motion_strength * motion_weight.unsqueeze(-1)
+
+    return dvf_fn
+
+
 # ============================================================
 # Volume warping via grid_sample
 # ============================================================
@@ -514,6 +557,9 @@ def cone_beam_simulate(
 # ============================================================
 
 
+DVFFn = "callable(grid_mm, motion_weight, anatomy, motion_params, t_ms) -> (Z,Y,X,3) DVF mm"
+
+
 def synthesize_motion_artifact(
     v_clean: torch.Tensor,
     heart_mask: torch.Tensor,
@@ -523,6 +569,7 @@ def synthesize_motion_artifact(
     n_phases: int = DEFAULT_N_PHASES,
     seed: int = 0,
     calibrate_hu: bool = True,
+    dvf_fn=None,
 ) -> tuple[torch.Tensor, dict[str, object]]:
     """Generate one motion-corrupted volume from a clean ImageCAS scan.
 
@@ -571,9 +618,10 @@ def synthesize_motion_artifact(
         0, motion_params.cardiac_period_ms, n_phases + 1, device=device
     )[:-1]
 
+    dvf_generator = dvf_fn if dvf_fn is not None else parametric_dvf
     v_dynamic = []
     for t in phase_times_ms:
-        dvf = parametric_dvf(grid_mm, motion_weight, anatomy, motion_params, t.item())
+        dvf = dvf_generator(grid_mm, motion_weight, anatomy, motion_params, t.item())
         v_dynamic.append(warp_volume(v_clean, grid_mm, dvf, voxel_size_mm))
 
     # ---- Cone-beam scan + FBP ----

@@ -35,6 +35,7 @@ from code.data.splits import load_split  # noqa: E402
 from code.evaluation.artifact_metrics import (  # noqa: E402
     assign_artifact_severity,
     load_heart_mask,
+    load_lumen_mask,
     metric_row,
     summarize,
 )
@@ -47,6 +48,20 @@ from code.models.residual_edm import ResidualEDM  # noqa: E402
 from code.training.train_residual_refiner import load_initializer  # noqa: E402
 
 log = logging.getLogger("evaluate_residual_diffusion_full_volume")
+
+_HU_LO, _HU_HI = -1024.0, 3071.0  # matches preprocessing.py normalization
+
+
+def _save_volume_nifti(tensor: torch.Tensor, path: "Path") -> None:
+    """Save a normalized [-1,1] (1,1,D,H,W) volume as an int16 HU NIfTI (1mm iso)."""
+    import SimpleITK as sitk  # local import: only when --save-volumes-dir is used
+
+    arr = tensor.detach().float().cpu().numpy()[0, 0]  # (Z, Y, X), normalized
+    hu = ((arr + 1.0) * 0.5 * (_HU_HI - _HU_LO) + _HU_LO).astype(np.int16)
+    img = sitk.GetImageFromArray(hu)
+    img.SetSpacing((1.0, 1.0, 1.0))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    sitk.WriteImage(img, str(path))
 
 DEFAULT_ROI_SIZE = 128
 DEFAULT_OVERLAP = 0.5
@@ -77,6 +92,9 @@ def _build_argparser() -> argparse.ArgumentParser:
         help="How to aggregate multiple residual samples. Currently only posterior mean is supported.",
     )
     p.add_argument("--residual-scale", type=float, default=1.0)
+    p.add_argument("--save-volumes-dir", type=Path, default=None,
+                   help="if set, export per-case NIfTI HU volumes "
+                        "(clean/corrupted/unet/diff_mean/diff_sample) for downstream segmentation")
     p.add_argument("--sample-sigma-min", type=float, default=None)
     p.add_argument("--sample-sigma-max", type=float, default=None)
     p.add_argument("--stochastic-churn", action="store_true")
@@ -318,11 +336,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     for idx, (split_name, case_id) in enumerate(selected):
         clean, corrupted = load_pair(case_id, processed_dir)
         heart_mask = load_heart_mask(case_id, processed_dir, tuple(clean.shape[-3:]))
+        lumen_mask = load_lumen_mask(case_id, processed_dir, tuple(clean.shape[-3:]))
         row: dict[str, object] = {
             "split": split_name,
             "case_id": case_id,
             "shape": "x".join(str(v) for v in clean.shape[-3:]),
             "heart_voxels": float(heart_mask.sum().item()),
+            "lumen_voxels": float(lumen_mask.sum().item()) if lumen_mask is not None else 0.0,
         }
         row.update(
             metric_row(
@@ -330,6 +350,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 corrupted,
                 clean,
                 heart_mask=heart_mask,
+                lumen_mask=lumen_mask,
                 boundary_radius=args.boundary_radius,
             )
         )
@@ -352,11 +373,13 @@ def main(argv: Optional[list[str]] = None) -> int:
             progress=args.progress,
             return_initial=True,
             return_uncertainty=args.n_samples > 1,
+            return_single_sample=True,
         )
+        # Return order: corrected, initial, [uncertainty], single_sample
         if args.n_samples > 1:
-            pred, initial, uncertainty = outputs
+            pred, initial, uncertainty, single = outputs
         else:
-            pred, initial = outputs
+            pred, initial, single = outputs
             uncertainty = None
         row.update(
             metric_row(
@@ -364,6 +387,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 initial,
                 clean,
                 heart_mask=heart_mask,
+                lumen_mask=lumen_mask,
                 boundary_radius=args.boundary_radius,
             )
         )
@@ -373,8 +397,22 @@ def main(argv: Optional[list[str]] = None) -> int:
                 pred,
                 clean,
                 heart_mask=heart_mask,
+                lumen_mask=lumen_mask,
                 boundary_radius=args.boundary_radius,
             )
+        )
+        row.update(
+            metric_row(
+                "diffusion_v2_sample",
+                single,
+                clean,
+                heart_mask=heart_mask,
+                lumen_mask=lumen_mask,
+                boundary_radius=args.boundary_radius,
+            )
+        )
+        row["diffusion_v2_sample_delta_vs_unet_mae_hu"] = (
+            float(row["diffusion_v2_sample_mae_hu"]) - float(row["unet_init_mae_hu"])
         )
         row["diffusion_v2_delta_vs_unet_mae_hu"] = (
             float(row["diffusion_v2_mae_hu"]) - float(row["unet_init_mae_hu"])
@@ -412,6 +450,14 @@ def main(argv: Optional[list[str]] = None) -> int:
                     corrected=pred[0, 0].detach().float().cpu().numpy(),
                     initial=initial[0, 0].detach().float().cpu().numpy(),
                 )
+        if args.save_volumes_dir is not None:
+            vdir = args.save_volumes_dir
+            _save_volume_nifti(clean, vdir / f"case_{case_id}__clean.nii.gz")
+            _save_volume_nifti(corrupted, vdir / f"case_{case_id}__corrupted.nii.gz")
+            _save_volume_nifti(initial, vdir / f"case_{case_id}__unet.nii.gz")
+            _save_volume_nifti(pred, vdir / f"case_{case_id}__diff_mean.nii.gz")
+            _save_volume_nifti(single, vdir / f"case_{case_id}__diff_sample.nii.gz")
+
         rows.append(row)
         log.info(
             "%s case %s | unet MAE %.2f diffusion_v2 %.2f delta %.2f",

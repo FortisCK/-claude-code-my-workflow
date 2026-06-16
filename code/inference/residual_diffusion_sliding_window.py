@@ -44,8 +44,17 @@ def sliding_window_residual_diffusion_correct(
     progress: bool = False,
     return_initial: bool = False,
     return_uncertainty: bool = False,
+    return_single_sample: bool = False,
+    single_sample_seed: int = 0,
 ) -> torch.Tensor | tuple[torch.Tensor, ...]:
-    """Run frozen U-Net initializer followed by residual EDM sampling."""
+    """Run frozen U-Net initializer followed by residual EDM sampling.
+
+    When `return_single_sample` is True, a coherent single posterior sample
+    (sample index 0, sharp — not averaged) is also stitched and returned, using a
+    fixed `single_sample_seed` across all patches so overlapping windows share the
+    same noise chain and the stitched single sample stays seam-consistent. This
+    lets us compare the sharp single sample against the blurry posterior mean.
+    """
     if v_corrupted.dim() != 5:
         raise ValueError(f"expected 5D `(B, C, D, H, W)` tensor, got {tuple(v_corrupted.shape)}")
     if v_corrupted.shape[1] != 1:
@@ -100,12 +109,15 @@ def sliding_window_residual_diffusion_correct(
     def predictor(patches: torch.Tensor) -> torch.Tensor:
         cond = patches.to(sw_dev, non_blocking=True)
         batch = cond.shape[0]
+        # Fixed seed only when we need a coherent single sample stitched across
+        # overlapping windows; otherwise keep the mean path stochastic (seed=None).
+        seed = single_sample_seed if return_single_sample else None
         residual_samples = engine.sample(
             cond,
             num_steps=num_steps,
             n_samples=n_samples,
             deterministic=deterministic,
-            seed=None,
+            seed=seed,
         )
         residual_samples = residual_samples.view(
             batch,
@@ -115,25 +127,39 @@ def sliding_window_residual_diffusion_correct(
         )
         residual_mean = residual_samples.mean(dim=1)
         corrected = cond[:, 1:2] + float(residual_scale) * residual_mean
-        if not return_uncertainty:
+        parts = [corrected]
+        if return_uncertainty:
+            residual_std = residual_samples.std(dim=1, unbiased=False) * abs(float(residual_scale))
+            parts.append(residual_std)
+        if return_single_sample:
+            single = cond[:, 1:2] + float(residual_scale) * residual_samples[:, 0]
+            parts.append(single)
+        if len(parts) == 1:
             return corrected.float()
-        residual_std = residual_samples.std(dim=1, unbiased=False) * abs(float(residual_scale))
-        return torch.cat([corrected, residual_std], dim=1).float()
+        return torch.cat(parts, dim=1).float()
 
     pred = inferer(condition.float(), predictor).float()
-    outputs: list[torch.Tensor] = []
+    # Channel order emitted by predictor: corrected, [residual_std], [single_sample]
+    idx = 0
+    corrected = pred[:, idx:idx + 1]
+    idx += 1
+    uncertainty = None
+    single_sample = None
     if return_uncertainty:
-        corrected = pred[:, :1]
-        uncertainty = pred[:, 1:2]
-        outputs.append(corrected)
-    else:
-        corrected = pred
-        uncertainty = None
-        outputs.append(corrected)
+        uncertainty = pred[:, idx:idx + 1]
+        idx += 1
+    if return_single_sample:
+        single_sample = pred[:, idx:idx + 1]
+        idx += 1
+
+    # Return order: corrected, [initial], [uncertainty], [single_sample]
+    outputs: list[torch.Tensor] = [corrected]
     if return_initial:
         outputs.append(initial.float())
     if return_uncertainty and uncertainty is not None:
         outputs.append(uncertainty.float())
+    if return_single_sample and single_sample is not None:
+        outputs.append(single_sample.float())
     if len(outputs) == 1:
         return outputs[0]
     return tuple(outputs)

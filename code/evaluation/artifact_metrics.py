@@ -14,11 +14,17 @@ import torch
 
 from code.evaluation.metrics import (
     all_metrics,
+    dice_lumen_masked,
+    dilate_mask,
+    lumen_contrast,
     make_boundary_band,
     masked_gradient_l1,
     masked_mae,
     masked_rmse,
+    masked_sharpness,
 )
+
+LUMEN_RING_RADIUS: int = 3  # voxels (~3 mm at 1 mm spacing) for lumen contrast/Dice band
 
 HU_SCALE: float = 2047.5  # [-1, 1] maps to [-1024, 3071].
 
@@ -42,6 +48,29 @@ def load_heart_mask(
     return mask.unsqueeze(0).unsqueeze(0)
 
 
+def load_lumen_mask(
+    case_id: str,
+    processed_dir: Path,
+    ref_shape: tuple[int, int, int],
+) -> torch.Tensor | None:
+    """Load the aligned coronary lumen mask as `(1, 1, D, H, W)` bool, or None.
+
+    Non-destructive sidecar produced by scripts/python/generate_lumen_masks.py at
+    `<processed_dir>/../lumen_masks/lumen_mask_<id>.npy`. Returns None if absent,
+    so evaluations on caches/cases without lumen masks degrade gracefully.
+    """
+    mask_path = processed_dir.parent / "lumen_masks" / f"lumen_mask_{case_id}.npy"
+    if not mask_path.exists():
+        return None
+    mask = torch.from_numpy(np.load(mask_path)).bool()
+    if tuple(mask.shape) != tuple(ref_shape):
+        raise ValueError(
+            f"lumen mask shape {tuple(mask.shape)} does not match volume shape {ref_shape} "
+            f"for case {case_id}"
+        )
+    return mask.unsqueeze(0).unsqueeze(0)
+
+
 def _scalar(value: torch.Tensor) -> float:
     return float(value.flatten()[0].item())
 
@@ -51,9 +80,10 @@ def metric_row(
     pred: torch.Tensor,
     target: torch.Tensor,
     heart_mask: torch.Tensor | None = None,
+    lumen_mask: torch.Tensor | None = None,
     boundary_radius: int = 3,
 ) -> dict[str, float]:
-    """Return global plus optional heart/boundary metrics for one prediction."""
+    """Return global plus optional heart/boundary/lumen metrics for one prediction."""
     metrics = all_metrics(pred.float(), target.float())
     abs_err = (pred.float() - target.float()).abs()
     out = {
@@ -64,31 +94,58 @@ def metric_row(
         f"{prefix}_nrmse": float(metrics["nrmse"].item()),
         f"{prefix}_dice_lumen_stub": float(metrics["dice_lumen_stub"].item()),
     }
-    if heart_mask is None:
-        return out
+    if heart_mask is not None:
+        mask = heart_mask.to(device=pred.device)
+        boundary = make_boundary_band(mask, radius=boundary_radius).to(device=pred.device)
+        heart_mae = _scalar(masked_mae(pred.float(), target.float(), mask))
+        heart_rmse = _scalar(masked_rmse(pred.float(), target.float(), mask))
+        boundary_mae = _scalar(masked_mae(pred.float(), target.float(), boundary))
+        boundary_rmse = _scalar(masked_rmse(pred.float(), target.float(), boundary))
+        boundary_grad_l1 = _scalar(masked_gradient_l1(pred.float(), target.float(), boundary))
+        out.update(
+            {
+                f"{prefix}_heart_mae_norm": heart_mae,
+                f"{prefix}_heart_mae_hu": heart_mae * HU_SCALE,
+                f"{prefix}_heart_rmse_norm": heart_rmse,
+                f"{prefix}_heart_rmse_hu": heart_rmse * HU_SCALE,
+                f"{prefix}_boundary_mae_norm": boundary_mae,
+                f"{prefix}_boundary_mae_hu": boundary_mae * HU_SCALE,
+                f"{prefix}_boundary_rmse_norm": boundary_rmse,
+                f"{prefix}_boundary_rmse_hu": boundary_rmse * HU_SCALE,
+                f"{prefix}_boundary_gradient_l1_norm": boundary_grad_l1,
+                f"{prefix}_boundary_gradient_l1_hu": boundary_grad_l1 * HU_SCALE,
+                f"{prefix}_boundary_voxels": float(boundary.sum().item()),
+            }
+        )
 
-    mask = heart_mask.to(device=pred.device)
-    boundary = make_boundary_band(mask, radius=boundary_radius).to(device=pred.device)
-    heart_mae = _scalar(masked_mae(pred.float(), target.float(), mask))
-    heart_rmse = _scalar(masked_rmse(pred.float(), target.float(), mask))
-    boundary_mae = _scalar(masked_mae(pred.float(), target.float(), boundary))
-    boundary_rmse = _scalar(masked_rmse(pred.float(), target.float(), boundary))
-    boundary_grad_l1 = _scalar(masked_gradient_l1(pred.float(), target.float(), boundary))
-    out.update(
-        {
-            f"{prefix}_heart_mae_norm": heart_mae,
-            f"{prefix}_heart_mae_hu": heart_mae * HU_SCALE,
-            f"{prefix}_heart_rmse_norm": heart_rmse,
-            f"{prefix}_heart_rmse_hu": heart_rmse * HU_SCALE,
-            f"{prefix}_boundary_mae_norm": boundary_mae,
-            f"{prefix}_boundary_mae_hu": boundary_mae * HU_SCALE,
-            f"{prefix}_boundary_rmse_norm": boundary_rmse,
-            f"{prefix}_boundary_rmse_hu": boundary_rmse * HU_SCALE,
-            f"{prefix}_boundary_gradient_l1_norm": boundary_grad_l1,
-            f"{prefix}_boundary_gradient_l1_hu": boundary_grad_l1 * HU_SCALE,
-            f"{prefix}_boundary_voxels": float(boundary.sum().item()),
-        }
-    )
+    if lumen_mask is not None:
+        lm = lumen_mask.to(device=pred.device)
+        # Surrounding tissue ring (epicardial fat / myocardium) for contrast.
+        ring = (dilate_mask(lm, LUMEN_RING_RADIUS) & ~lm.bool()).to(device=pred.device)
+        region = dilate_mask(lm, LUMEN_RING_RADIUS).to(device=pred.device)
+        lumen_mae = _scalar(masked_mae(pred.float(), target.float(), lm))
+        lumen_rmse = _scalar(masked_rmse(pred.float(), target.float(), lm))
+        lumen_grad_l1 = _scalar(masked_gradient_l1(pred.float(), target.float(), lm))
+        lumen_sharp = _scalar(masked_sharpness(pred.float(), lm))
+        lumen_sharp_ref = _scalar(masked_sharpness(target.float(), lm))
+        lumen_cnr = _scalar(lumen_contrast(pred.float(), lm, ring))
+        lumen_cnr_ref = _scalar(lumen_contrast(target.float(), lm, ring))
+        lumen_dice = _scalar(dice_lumen_masked(pred.float(), target.float(), region))
+        out.update(
+            {
+                f"{prefix}_lumen_mae_norm": lumen_mae,
+                f"{prefix}_lumen_mae_hu": lumen_mae * HU_SCALE,
+                f"{prefix}_lumen_rmse_hu": lumen_rmse * HU_SCALE,
+                f"{prefix}_lumen_gradient_l1_hu": lumen_grad_l1 * HU_SCALE,
+                f"{prefix}_lumen_sharpness_hu": lumen_sharp * HU_SCALE,
+                f"{prefix}_lumen_sharpness_ref_hu": lumen_sharp_ref * HU_SCALE,
+                f"{prefix}_lumen_cnr_hu": lumen_cnr * HU_SCALE,
+                f"{prefix}_lumen_cnr_ref_hu": lumen_cnr_ref * HU_SCALE,
+                f"{prefix}_lumen_dice": lumen_dice,
+                f"{prefix}_lumen_voxels": float(lm.sum().item()),
+            }
+        )
+
     return out
 
 
