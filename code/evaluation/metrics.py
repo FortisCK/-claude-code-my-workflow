@@ -192,6 +192,42 @@ def dice_lumen_masked(
     return (2.0 * intersect + eps) / (union + eps)
 
 
+def lumen_soft_dice_loss(
+    pred: torch.Tensor,
+    lumen_mask: torch.Tensor,
+    band_mask: torch.Tensor | None = None,
+    hu_threshold: float = LUMEN_CONTRAST_HU,
+    temp_hu: float = 50.0,
+    eps: float = 1e-6,
+) -> torch.Tensor:
+    """Differentiable lumen-aware soft-Dice LOSS (1 - softDice), per-sample.
+
+    Rewards a soft contrast response sigmoid((x - tau)/T) that overlaps the GT
+    coronary lumen mask and NOT the surrounding band — i.e. restored contrast
+    exactly where GT says vessel. Fully differentiable in `pred` (normalized
+    [-1,1]); uses no segmenter, so it cannot game the frozen-segmenter judge.
+
+    Args:
+        pred: (B,1,D,H,W) restored volume in normalized [-1,1].
+        lumen_mask: GT coronary lumen (bool-like), broadcastable to pred.
+        band_mask: optional region to restrict the soft-Dice (e.g. dilated lumen),
+            so background voxels do not dominate. If None, computed over the volume.
+        hu_threshold: contrast level (HU) for the soft response.
+        temp_hu: sigmoid temperature in HU.
+    """
+    thr = hu_to_norm(hu_threshold)
+    t_norm = temp_hu / (_HU_CLIP_HI - _HU_CLIP_LO) * 2.0
+    resp = torch.sigmoid((pred - thr) / t_norm)  # soft "is contrast" in [0,1]
+    lm = _as_bool_mask(lumen_mask, pred).to(pred.dtype)
+    if band_mask is not None:
+        band = _as_bool_mask(band_mask, pred).to(pred.dtype)
+        resp = resp * band
+        lm = lm * band
+    num = 2.0 * (resp * lm).flatten(1).sum(dim=1)
+    den = resp.flatten(1).sum(dim=1) + lm.flatten(1).sum(dim=1)
+    return 1.0 - (num + eps) / (den + eps)
+
+
 def psnr(pred: torch.Tensor, target: torch.Tensor, data_range: float = 2.0) -> torch.Tensor:
     """Peak-signal-to-noise ratio (dB), elementwise then per-sample mean.
 
