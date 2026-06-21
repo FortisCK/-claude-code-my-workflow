@@ -101,6 +101,12 @@ class MotionParams:
                                         # Maier used w(r) → 0 at patch boundary).
                                         # Set to 0 to disable smoothing (legacy behavior).
 
+    # New (2026-06-19): cardiac phase offset — shifts WHICH gantry views see peak-systolic
+    # deformation (the only operator DoF that re-SHAPES, not just scales, the artifact).
+    # Applied once at the shared time→profile point in parametric_dvf (so it affects BOTH
+    # synthesize_motion_artifact and the DPS forward operator identically). frac of one cycle.
+    phase_offset_frac: float = 0.0
+
     @property
     def twist_amp_rad(self) -> float:
         return math.radians(self.twist_amp_deg)
@@ -270,7 +276,10 @@ def parametric_dvf(
     radius = float(anatomy["radius_mm"])
     axial_extent = float(anatomy["axial_extent_mm"])
 
-    s_t = time_profile(t_ms, motion_params.cardiac_period_ms)
+    # phase offset shifts which cardiac time this phase bucket represents (shared by
+    # synth + DPS forward op; time_profile mods by period internally).
+    t_eff = t_ms + motion_params.phase_offset_frac * motion_params.cardiac_period_ms
+    s_t = time_profile(t_eff, motion_params.cardiac_period_ms)
 
     r = grid_mm - centroid                                  # (Z, Y, X, 3)
     r_norm = torch.linalg.norm(r, dim=-1, keepdim=True)     # (Z, Y, X, 1)
@@ -342,7 +351,8 @@ def make_random_smooth_dvf_fn(
             mag = torch.linalg.norm(d0, dim=-1).max()
             d0 = d0 / (mag + EPS_FP32) * peak_mm
             cache[key] = d0.to(device)
-        s_t = time_profile(t_ms, motion_params.cardiac_period_ms)
+        t_eff = t_ms + motion_params.phase_offset_frac * motion_params.cardiac_period_ms
+        s_t = time_profile(t_eff, motion_params.cardiac_period_ms)
         return cache[key] * s_t * motion_params.motion_strength * motion_weight.unsqueeze(-1)
 
     return dvf_fn

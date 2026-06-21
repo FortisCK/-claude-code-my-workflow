@@ -74,3 +74,8 @@ first posterior with meaningful σ_r), stop chasing accuracy. Run card
   (ECE/coverage/reliability diagram) — needed to defend the UQ claim.
 - Novelty #3 (downstream lumen eval) — `dice_lumen` still a STUB, not TAVI-calibrated.
 - Whether to build v3b (v3a + weak sparse high-confidence oracle aux loss).
+
+
+---
+**Context compaction (auto) at 14:15**
+Check git log and quality_reports/plans/ for current state.
