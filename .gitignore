@@ -57,6 +57,24 @@ master_supporting_docs/supporting_papers/*.pdf
 paper/main.pdf
 paper/*-converted-to.pdf
 
+# Dated paper draft snapshots (regenerate via pdflatex)
+paper/TRUST_*.pdf
+
+# Loose reference / advisor-reviewed PDFs at repo root (too large for git)
+/*.pdf
+
+# Agent tooling caches and machine-local scaffolding
+.cache/
+.mplconfig/
+.agents/
+.codex/
+
+# Session transcript dumps (large, machine-local)
+*.jsonl
+
+# Side-run / pet artifacts
+quality_reports/pets/
+
 # IDE
 .vscode/
 .idea/
