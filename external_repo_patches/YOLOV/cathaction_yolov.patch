@@ -1,0 +1,175 @@
+diff --git a/yolox/data/datasets/vid.py b/yolox/data/datasets/vid.py
+index 8c65ac9..57fb9a4 100644
+--- a/yolox/data/datasets/vid.py
++++ b/yolox/data/datasets/vid.py
+@@ -2,6 +2,7 @@
+ # -*- coding:utf-8 -*-
+ # Copyright (c) Megvii, Inc. and its affiliates.
+ import copy
++import json
+ import os
+ import random
+ 
+@@ -15,6 +16,8 @@ from torch.utils.data.dataset import Dataset as torchDataset
+ from torch.utils.data.sampler import Sampler,BatchSampler,SequentialSampler
+ from xml.dom import minidom
+ import math
++from pycocotools.coco import COCO
++from .coco import remove_useless_info
+ from yolox.utils import xyxy2cxcywh
+ 
+ IMAGE_EXT = [".jpg", ".jpeg", ".webp", ".bmp", ".png",".JPEG"]
+@@ -617,7 +620,7 @@ class TestSampler(SequentialSampler):
+ 
+ class TrainSampler(Sampler):
+     def __init__(self,data_source):
+-        super().__init__(data_source)
++        super().__init__()
+         self.data_source = data_source
+ 
+     def __iter__(self):
+diff --git a/yolox/evaluators/coco_evaluator.py b/yolox/evaluators/coco_evaluator.py
+index 25d0db3..088d960 100644
+--- a/yolox/evaluators/coco_evaluator.py
++++ b/yolox/evaluators/coco_evaluator.py
+@@ -277,12 +277,8 @@ class COCOEvaluator:
+                 _, tmp = tempfile.mkstemp()
+                 json.dump(data_dict, open(tmp, "w"))
+                 cocoDt = cocoGt.loadRes(tmp)
+-            try:
+-                from yolox.layers import COCOeval_opt as COCOeval
+-            except ImportError:
+-                from pycocotools.cocoeval import COCOeval
+-
+-                logger.warning("Use standard COCOeval.")
++            from pycocotools.cocoeval import COCOeval
++            logger.warning("Use standard COCOeval.")
+ 
+             cocoEval = COCOeval(cocoGt, cocoDt, annType[1])
+             cocoEval.evaluate()
+diff --git a/yolox/evaluators/vid_evaluator_v2.py b/yolox/evaluators/vid_evaluator_v2.py
+index a117f85..f89152c 100644
+--- a/yolox/evaluators/vid_evaluator_v2.py
++++ b/yolox/evaluators/vid_evaluator_v2.py
+@@ -147,6 +147,20 @@ class VIDEvaluator:
+             'images': [],
+             'licenses': []
+         }
++        category_names = self.kwargs.get("class_names")
++        if category_names is None:
++            if self.num_classes == 1:
++                category_names = ("tip",)
++            elif self.num_classes == 2:
++                category_names = ("normal", "collision")
++            else:
++                category_names = tuple(f"class_{idx}" for idx in range(self.num_classes))
++        categories = [
++            {"supercategory": "", "id": idx, "name": name}
++            for idx, name in enumerate(category_names[: self.num_classes])
++        ]
++        self.vid_to_coco["categories"] = categories
++        self.vid_to_coco_ori["categories"] = copy.deepcopy(categories)
+         self.testdev = testdev
+         self.tmp_name_ori = './ori_pred.json'
+         self.tmp_name_refined = './refined_pred.json'
+@@ -401,12 +415,8 @@ class VIDEvaluator:
+             _, tmp = tempfile.mkstemp()
+             json.dump(data_dict, open(tmp, "w"))
+             cocoDt = cocoGt.loadRes(tmp)
+-            try:
+-                from yolox.layers import COCOeval_opt as COCOeval
+-            except ImportError:
+-                from pycocotools.cocoeval import COCOeval
+-
+-                logger.warning("Use standard COCOeval.")
++            from pycocotools.cocoeval import COCOeval
++            logger.warning("Use standard COCOeval.")
+ 
+             cocoEval = COCOeval(cocoGt, cocoDt, annType[1])
+             cocoEval.evaluate()
+diff --git a/yolox/models/yolo_pafpn.py b/yolox/models/yolo_pafpn.py
+index 12cc2da..1df39bc 100644
+--- a/yolox/models/yolo_pafpn.py
++++ b/yolox/models/yolo_pafpn.py
+@@ -116,6 +116,81 @@ class YOLOPAFPN(nn.Module):
+         return outputs
+ 
+ 
++class YOLOPAFPN_P2(nn.Module):
++    """YOLOPAFPN extended with a P2 (stride-4) detection level for tiny objects.
++
++    Emits 4 levels finest-first: (P2/4, P3/8, P4/16, P5/32). in_channels nominal
++    [128,256,512,1024] map (x width) to dark2/3/4/5 actual channels.
++    """
++
++    def __init__(
++        self,
++        depth=1.0,
++        width=1.0,
++        in_features=("dark2", "dark3", "dark4", "dark5"),
++        in_channels=[128, 256, 512, 1024],
++        depthwise=False,
++        act="silu",
++    ):
++        super().__init__()
++        self.backbone = CSPDarknet(depth, width, out_features=in_features, depthwise=depthwise, act=act)
++        self.in_features = in_features
++        self.in_channels = in_channels
++        Conv = DWConv if depthwise else BaseConv
++        w = width
++
++        self.upsample = nn.Upsample(scale_factor=2, mode="nearest")
++        # top-down P5 -> P4 -> P3 -> P2 (indices shifted +1 vs base YOLOPAFPN)
++        self.lateral_conv0 = BaseConv(int(in_channels[3] * w), int(in_channels[2] * w), 1, 1, act=act)
++        self.C3_p4 = CSPLayer(int(2 * in_channels[2] * w), int(in_channels[2] * w), round(3 * depth), False, depthwise=depthwise, act=act)
++        self.reduce_conv1 = BaseConv(int(in_channels[2] * w), int(in_channels[1] * w), 1, 1, act=act)
++        self.C3_p3 = CSPLayer(int(2 * in_channels[1] * w), int(in_channels[1] * w), round(3 * depth), False, depthwise=depthwise, act=act)
++        # new fine end: P3 -> P2
++        self.reduce_conv2 = BaseConv(int(in_channels[1] * w), int(in_channels[0] * w), 1, 1, act=act)
++        self.C3_p2 = CSPLayer(int(2 * in_channels[0] * w), int(in_channels[0] * w), round(3 * depth), False, depthwise=depthwise, act=act)
++        # bottom-up P2 -> P3 -> P4 -> P5
++        self.bu_conv3 = Conv(int(in_channels[0] * w), int(in_channels[0] * w), 3, 2, act=act)
++        self.C3_n2 = CSPLayer(int(2 * in_channels[0] * w), int(in_channels[1] * w), round(3 * depth), False, depthwise=depthwise, act=act)
++        self.bu_conv2 = Conv(int(in_channels[1] * w), int(in_channels[1] * w), 3, 2, act=act)
++        self.C3_n3 = CSPLayer(int(2 * in_channels[1] * w), int(in_channels[2] * w), round(3 * depth), False, depthwise=depthwise, act=act)
++        self.bu_conv1 = Conv(int(in_channels[2] * w), int(in_channels[2] * w), 3, 2, act=act)
++        self.C3_n4 = CSPLayer(int(2 * in_channels[2] * w), int(in_channels[3] * w), round(3 * depth), False, depthwise=depthwise, act=act)
++
++    def forward(self, input):
++        out_features = self.backbone(input)
++        features = [out_features[f] for f in self.in_features]
++        [x3, x2, x1, x0] = features  # dark2/4, dark3/8, dark4/16, dark5/32
++
++        fpn_out0 = self.lateral_conv0(x0)            # 1024->512 /32
++        f_out0 = self.upsample(fpn_out0)             # /16
++        f_out0 = torch.cat([f_out0, x1], 1)          # ->1024 /16
++        f_out0 = self.C3_p4(f_out0)                  # ->512 /16
++
++        fpn_out1 = self.reduce_conv1(f_out0)         # 512->256 /16
++        f_out1 = self.upsample(fpn_out1)             # /8
++        f_out1 = torch.cat([f_out1, x2], 1)          # ->512 /8
++        x_p3 = self.C3_p3(f_out1)                    # ->256 /8 (top-down P3)
++
++        fpn_out2 = self.reduce_conv2(x_p3)           # 256->128 /8
++        f_out2 = self.upsample(fpn_out2)             # /4
++        f_out2 = torch.cat([f_out2, x3], 1)          # ->256 /4
++        pan_out_p2 = self.C3_p2(f_out2)              # ->128 /4  (P2 OUT)
++
++        p_p3 = self.bu_conv3(pan_out_p2)             # 128 /8
++        p_p3 = torch.cat([p_p3, fpn_out2], 1)        # ->256 /8
++        pan_out2 = self.C3_n2(p_p3)                  # ->256 /8  (P3 OUT)
++
++        p_out1 = self.bu_conv2(pan_out2)             # 256 /16
++        p_out1 = torch.cat([p_out1, fpn_out1], 1)    # ->512 /16
++        pan_out1 = self.C3_n3(p_out1)                # ->512 /16 (P4 OUT)
++
++        p_out0 = self.bu_conv1(pan_out1)             # 512 /32
++        p_out0 = torch.cat([p_out0, fpn_out0], 1)    # ->1024 /32
++        pan_out0 = self.C3_n4(p_out0)                # ->1024 /32 (P5 OUT)
++
++        return (pan_out_p2, pan_out2, pan_out1, pan_out0)  # strides 4/8/16/32
++
++
+ from .swin_transfomer import SwinTransformer
+ class YOLOPAFPN_Swin(nn.Module):
+     """

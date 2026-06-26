@@ -39,3 +39,8 @@ Added `.gitignore` rules for generated split lists / `*.local.yaml` (machine-spe
 - `docker` binary not installed on host → in-container smoke blocked (`apt install docker.io`).
 - Base python lacks pytest; use `/home/mingzhang/miniconda3/envs/cathaction-task1/bin/python`.
 - Whole repo (scripts, decisions, configs) is still **untracked in git** — recommend committing code+docs (data/outputs ignored) at a Tier A checkpoint.
+
+
+---
+**Context compaction (auto) at 10:47**
+Check git log and quality_reports/plans/ for current state.

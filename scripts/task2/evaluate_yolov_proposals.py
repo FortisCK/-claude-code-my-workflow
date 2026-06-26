@@ -66,6 +66,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--half", action="store_true")
     parser.add_argument("--data-num-workers", type=int, default=0)
     parser.add_argument("--seed", type=int, default=2026)
+    parser.add_argument(
+        "--splits",
+        nargs="+",
+        default=None,
+        help="Override split specs as name=annotation.json (e.g. train=cathaction_train.json). "
+        "Defaults to the three valid panels.",
+    )
     return parser.parse_args()
 
 
@@ -107,11 +114,14 @@ def main() -> int:
     (run_dir / "args.json").write_text(json.dumps(json_ready(args_record), indent=2) + "\n", encoding="utf-8")
     print(json.dumps(json_ready(args_record), indent=2), flush=True)
 
-    split_specs = [
-        SplitSpec("valid_combined", "cathaction_valid_combined.json"),
-        SplitSpec("valid_phantom", "cathaction_valid_phantom.json"),
-        SplitSpec("valid_animal", "cathaction_valid_animal.json"),
-    ]
+    if args.splits:
+        split_specs = [SplitSpec(*spec.split("=", 1)) for spec in args.splits]
+    else:
+        split_specs = [
+            SplitSpec("valid_combined", "cathaction_valid_combined.json"),
+            SplitSpec("valid_phantom", "cathaction_valid_phantom.json"),
+            SplitSpec("valid_animal", "cathaction_valid_animal.json"),
+        ]
     all_metrics: dict[str, Any] = {}
     for split_spec in split_specs:
         exp.val_name = split_spec.name
