@@ -75,6 +75,10 @@ paper/TRUST_*.pdf
 # Side-run / pet artifacts
 quality_reports/pets/
 
+# Loose screenshots (macOS)
+截屏*.png
+Screenshot*.png
+
 # IDE
 .vscode/
 .idea/
