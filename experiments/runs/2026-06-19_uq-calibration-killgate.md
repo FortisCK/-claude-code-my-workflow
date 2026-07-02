@@ -45,6 +45,14 @@ ranks errors (AUSE 0.65 — scaling cannot fix the ranking). => an HONEST SUPPOR
 abstention story, NOT a paper-carrying standalone result. The cheap error_corr gate oversold it;
 the full suite is the truth.
 
+## Temperature scaling (uq_temp_scale.py) — fixes the under-coverage
+
+Single scalar T=1.87 fit on train cases, evaluated held-out: 90%-nominal coverage
+0.72 -> 0.92, 50%-nominal 0.37 -> 0.61. => after temperature scaling, σ_r intervals are
+~calibrated on held-out cases (ranking/AUSE unchanged). The UQ leg is now publication-grade:
+informative (r 0.35), moderate ranking (AUSE 0.65), calibrated coverage (post-T). Honest
+supporting leg for the abstention story.
+
 ## Anti-cheat correction (verified on disk this session)
 
 TS coronary_arteries = Dataset509, coronary_arteries_LEGACY = Dataset507 — BOTH
