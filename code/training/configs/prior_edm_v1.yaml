@@ -1,0 +1,63 @@
+# prior_edm_v1.yaml — unconditional clean cardiac 3D image prior p(x) for DPS sparse-view recon.
+# Standard Karras image-EDM params (sigma_data 0.5, sigma_max 80) — clean images, not residuals.
+
+run:
+  slug: "prior_edm_v1"
+  seed: 42
+  device: "cuda"
+
+data:
+  processed_dir: null
+  case_ids_train: null
+  case_ids_val: null
+  split_file: "data/imagecas/splits/v1.json"
+  val_split: 0.05
+  pair_mode: "precomputed"          # loads (volume, corrupted); we use only volume
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+augmentation:
+  p_flip: 0.5
+  rotate_range_deg: 5.0
+  shift_range_voxels: 2
+
+denoiser:
+  target_channels: 1
+  condition_channels: 0             # UNCONDITIONAL
+  channels: [32, 64, 128, 128]
+  num_res_blocks: [2, 2, 2, 2]
+  attention_levels: [false, false, false, false]
+  num_head_channels: [32, 32, 32, 32]
+  norm_num_groups: 32
+
+edm:
+  sigma_min: 0.002
+  sigma_max: 80.0
+  sigma_data: 0.5
+  rho: 7.0
+  P_mean: -1.2
+  P_std: 1.2
+
+ema:
+  enabled: true
+  decay: 0.9995
+
+optim:
+  lr: 1.0e-4
+  betas: [0.9, 0.999]
+  weight_decay: 0.0
+
+train:
+  batch_size: 1
+  patch_size: [128, 128, 128]
+  n_epochs: 120
+  grad_accum_steps: 1
+  amp: true
+  log_every_steps: 50
+  ckpt_every_epochs: 10
+  ckpt_dir: "experiments/checkpoints/prior_edm_v1"
+
+wandb:
+  project: "cardiac-diffusion"
+  enabled: false
