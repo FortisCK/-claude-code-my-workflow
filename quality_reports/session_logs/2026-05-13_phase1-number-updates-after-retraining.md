@@ -503,3 +503,92 @@ Verification:
 | PDF page count | 18 pages |
 | Undefined citations/references | 0 |
 | Remaining overfull boxes | One tiny existing warning: 0.55pt at line 354 |
+
+## 2026-09-01 New 10-Landmark Multi-Reader Data Audit
+
+Reviewed the newly supplied `RE TDM TAVI.zip` and clarified how it relates to the existing downstream and multi-reader analyses. No manuscript text was changed during this audit.
+
+Data inventory:
+
+- Jean: one complete P0--P9 annotation set for cases 101--150.
+- Leo: two P0--P9 annotation sessions for cases 101--150, stored as separate P0--P7 and P8--P9 files.
+- Leo session 1 case 101 contains only one coronary-ostium point; analyses involving both ostia must treat that entry as missing rather than impute it.
+- This is single-center multi-reader data, not multi-center data.
+
+Cohort clarification:
+
+- The authoritative Phase 5 downstream JSON uses cases `81, 82, 83, 85, 86, 87, 89, 91, 92, 93, 94, 95, 97, 99, 103, 105, 107, 108, 111, 112, 115, 117, 119, 120, 123, 124, 126, 127, 129, 130` (n=30).
+- Its overlap with the new 101--150 annotation cohort is `103, 105, 107, 108, 111, 112, 115, 117, 119, 120, 123, 124, 126, 127, 129, 130` (n=16).
+- The previous `n30_consistent` summary CSVs contain aggregate results but no case IDs. Their existing description as the same 30-case paper test set is therefore inconsistent with the locally authoritative downstream cohort and must not be carried forward without case-level verification.
+
+New downstream results supplied by the user include TRUST versus Leo session 1, Jean, and Leo session 2, plus all human--human comparisons for MSL, three-hinge diameter, three-hinge circular area, and left/right coronary height. The results show large Jean--Leo differences for P0--P2-derived measurements, substantially smaller Leo test--retest differences, and relatively consistent human coronary-height measurements. These results can support a multi-reader downstream analysis after the exact case set and sample size for each row are confirmed. A full 10-landmark multi-reader claim additionally requires overall/per-point localization results, especially P8 and P9.
+
+## 2026-09-02 Multi-Reader Downstream Results Replacement
+
+Replaced the manuscript's previous 8-landmark multi-reader results with the newly supplied measurement-level comparisons. Per the user's instruction, the principal 100/20/30 split and 30-case test-set description were retained in this pass.
+
+Actions:
+
+- Replaced Table X with six pairwise comparisons among TRUST, Jean, and Leo's two annotation sessions for MSL, three-hinge circumdiameter, three-hinge circular area, LCO height, and RCO height.
+- Used anonymized manuscript labels: Leo session 1/2 as Reader A1/A2 and Jean as Reader B.
+- Reframed the Results to distinguish inter-reader variability, Reader A test--retest repeatability, and model--reader error.
+- Removed the superseded 8-point MRE, P7 reader-bottleneck, MSL-threshold, C-arm, and DLZ multi-reader claims from this subsection.
+- Updated the contribution statement, dataset annotation description, evaluation metrics, Discussion, Limitations, and Conclusion.
+- Kept the interpretation restrained: hinge-derived TRUST--reader errors are within the observed inter-reader range, but the model does not uniformly reach intra-reader repeatability; coronary-height model--reader errors exceed human--human MAEs, especially for LCO.
+- Synchronized `paper/main_zh.md` with the authoritative LaTeX text.
+
+Verification:
+
+| Check | Result |
+|-------|--------|
+| pdflatex + bibtex + pdflatex + pdflatex | Passed |
+| PDF page count | 18 pages |
+| Revised Table X placement | Page 16 top; visually clear, no clipping or overlap |
+| Undefined citations/references | 0 |
+| Overfull boxes | One pre-existing 0.55 pt equation warning at line 354 |
+| Stale old multi-reader claims | 0 targeted matches |
+
+The aggregate results supplied in chat did not include case-level IDs or per-row sample sizes. Before final submission, the retained same-30-case description should still be checked against the case-level analysis output.
+
+## 2026-09-02 Corrected Full 10-Landmark Multi-Reader Results
+
+The user clarified that Reader A1 is the original ground-truth annotation and that the previously supplied six-row downstream values may contain errors. The provisional Table X and all interpretations based on those values were removed.
+
+Final changes for this pass:
+
+- Kept TRUST versus Reader A1 only as the primary evaluation already reported earlier in the manuscript; it is not duplicated in Table X.
+- Rebuilt Table X with three corrected comparisons: Reader B versus Reader A2, TRUST versus Reader B, and TRUST versus Reader A2.
+- Added a landmark-localization panel reporting P0--P7 MRE, full 10-point MRE, P8--P9 MRE, full-set SDR at 2 and 4 mm, and counts above 10 mm.
+- Added a downstream panel reporting MSL, three-hinge diameter, three-hinge circular area, LCO/RCO height, annular-plane angle, and total DLZ MAE.
+- Revised the Results and Discussion to state that overall model--reader performance is close to but above reader--reader disagreement, with the largest gap at P8--P9.
+- Updated the dataset description, evaluation protocol, limitations, conclusion, contribution statement, and Chinese review copy.
+- Moved the expanded two-panel float earlier in the source so that Table X remains at the top of PDF page 16.
+
+Verification:
+
+| Check | Result |
+|-------|--------|
+| Full compile sequence plus final layout passes | Passed |
+| PDF page count | 18 pages |
+| Table X | Page 16 top; both panels readable and within margins |
+| Undefined citations/references | 0 |
+| Overfull boxes | Only the pre-existing 0.55 pt equation warning at line 354 |
+| Provisional six-row values / TRUST-vs-A1 row | Removed from English and Chinese manuscripts |
+
+## 2026-09-03 Broad Post-TRUST Research Ideation
+
+The user clarified that Carlos's multiphase valve-angle work and ImageCAS were examples rather than constraints on the next-paper search. A broader scan was therefore performed across recent landmark, active-learning, uncertainty-calibration, foundation-model, domain-adaptation, dense-geometry, synthetic-data, and TAVI outcome literature.
+
+Main outcome:
+
+- Ranked clinically measurement-aware active annotation as the best immediate use of the growing 1,000+ unlabeled TAVI archive.
+- Ranked sparse-landmark-to-dense-root geometry as the strongest clinically oriented follow-up, conditional on obtaining a small expert-reviewed contour set.
+- Identified structured landmark/measurement calibration, external-domain adaptation, anatomy-grounded outcome prediction, generalist landmark models, and rare-anatomy synthesis as additional directions with explicit data dependencies and risks.
+- Treated public datasets as auxiliary supervision or domain resources, not substitutes for same-definition external P0--P9 ground truth.
+- Recorded the full analysis in `quality_reports/research_ideation_post_TRUST_next_paper.md`.
+
+## 2026-09-03 CathAction and TAVI Navigation Direction
+
+Reviewed the CathAction benchmark and its relationship to a possible TAVI navigation study. CathAction provides prior experience and data for catheter/guidewire segmentation, action recognition and anticipation, collision detection, and cross-domain endovascular video learning. However, generic CT--fluoroscopy overlay is already established, so a credible new study would need CT-plan-conditioned temporal deployment tracking, plan-deviation prediction, and corrective guidance.
+
+The direction was recorded but parked as a longer-term candidate because key local data availability is unknown: same-patient preoperative CT and raw intraoperative XA DICOM/fluoroscopy, recoverable C-arm projection geometry, valve/device records, deployment depth, procedure timestamps, and clinician-selected final angles. Public unpaired datasets can support component pretraining or simulation but cannot validate patient-specific navigation.
