@@ -1,0 +1,87 @@
+# ==============================================================================
+# .gitignore for TRUST Paper Project
+# ==============================================================================
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.vrb
+*.synctex.gz
+*.run.xml
+*-blx.bib
+
+# Compiled PDFs (uncomment to track specific PDFs)
+# *.pdf
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+*.egg
+dist/
+build/
+.pytest_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Deep learning artifacts (if visualization scripts generate them)
+*.pth
+*.pt
+*.onnx
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude Code local files (not shared across machines)
+.claude/settings.local.json
+.claude/state/
+large_tool_results/
+
+# Supporting paper PDFs (too large for git)
+master_supporting_docs/supporting_papers/*.pdf
+
+# Compiled paper PDF (regenerate via pdflatex)
+paper/main.pdf
+paper/*-converted-to.pdf
+
+# Dated paper draft snapshots (regenerate via pdflatex)
+paper/TRUST_*.pdf
+
+# Loose reference / advisor-reviewed PDFs at repo root (too large for git)
+/*.pdf
+
+# Agent tooling caches and machine-local scaffolding
+.cache/
+.mplconfig/
+.agents/
+.codex/
+
+# Session transcript dumps (large, machine-local)
+*.jsonl
+
+# Side-run / pet artifacts
+quality_reports/pets/
+
+# Loose screenshots (macOS)
+截屏*.png
+Screenshot*.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

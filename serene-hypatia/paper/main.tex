@@ -1,0 +1,819 @@
+\documentclass[conference]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\graphicspath{{../}{./}}
+\usepackage{hyperref}
+\usepackage{cite}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{multirow}
+
+\begin{document}
+\title{TRUST: Topological Reasoning and Uncertainty-aware Semi-supervised Teaching for TAVI Landmark Detection and Coronary Safety Assessment}
+\author{First A. Author, \IEEEmembership{Fellow, IEEE}, Second B. Author, and Third C. Author Jr., \IEEEmembership{Member, IEEE}
+\thanks{This paragraph of the first footnote will contain the date on
+which you submitted your paper for review. It will also contain support
+information, including sponsor and financial support acknowledgment. For
+example, ``This work was supported in part by the U.S. Department of
+Commerce under Grant 123456.'' }
+\thanks{The next few paragraphs should contain
+the authors' current affiliations, including current address and e-mail. For
+example, First A. Author is with the National Institute of Standards and
+Technology, Boulder, CO 80305 USA (e-mail: author@boulder.nist.gov). }
+\thanks{Second B. Author Jr. was with Rice University, Houston, TX 77005 USA. He is
+now with the Department of Physics, Colorado State University, Fort Collins,
+CO 80523 USA (e-mail: author@lamar.colostate.edu).}
+\thanks{Third C. Author is with
+the Electrical Engineering Department, University of Colorado, Boulder, CO
+80309 USA, on leave from the National Research Institute for Metals,
+Tsukuba, Japan (e-mail: author@nrim.go.jp).}}
+
+\maketitle
+
+\begin{abstract}
+Transcatheter aortic valve implantation (TAVI) planning requires accurate localization of aortic root landmarks from preprocedural computed tomography (CT) to assess conduction, coronary, sizing, and deployment risks. Existing methods detect only a partial landmark set in a fully supervised setting, leaving coronary obstruction risk assessment outside the automated pipeline while requiring complete annotation of three-dimensional (3D) CT volumes. We propose TRUST (Topological Reasoning and Uncertainty-aware Semi-supervised Teaching), a two-stage semi-supervised framework that detects 10 aortic root landmarks, including the coronary ostia for coronary safety assessment. TRUST estimates a unified per-landmark uncertainty from a cross-student test-time augmentation (TTA) pool and decomposes it via the law of total variance into within-student TTA-perturbation variance and cross-student disagreement. Rather than using uncertainty as a single-purpose heuristic, TRUST routes this training-time reliability signal to three coordinated consumers: cross pseudo supervision (CPS) loss weighting, uncertainty-guided heat conduction operator (UG-HCO) diffusivity conditioning, and topological graph convolutional network (Topo-GCN) message-passing gating. On a dataset of 150 labeled and 620 unlabeled aortic root CT volumes (100 training, 20 validation, 30 test), TRUST achieves a mean radial error (MRE) of 2.19\,mm, reducing error by 21.5\% relative to the strongest supervised baseline. Ablation studies identify unified uncertainty as the largest single-step contributor. \textcolor{red}{Downstream analyses across six TAVI planning measurements indicate that the improved landmark accuracy translates into useful measurement-level agreement for TAVI planning. Remaining validation targets include annular-area approximation and external validation of coronary-height screening.}
+\end{abstract}
+
+\begin{IEEEkeywords}
+Aortic root, coronary safety, landmark detection, semi-supervised learning, TAVI, topology
+\end{IEEEkeywords}
+
+% ============================================================================
+\section{Introduction}
+\label{sec:introduction}
+% ============================================================================
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{figs/aortic_root_anatomy.pdf}
+\caption{Anatomical overview of the aortic root and the 10 landmarks targeted in this work. Left: cross-sectional view of the heart showing the aortic root at the junction of the left ventricle and the ascending aorta. Right: magnified top-down schematic of the aortic valve with its three cusps---non-coronary (NCC), left coronary (LCC), and right coronary (RCC). The 10 landmarks are: hinge points at the nadir of each cusp ($P_0$: NCC, $P_1$: RCC, $P_2$: LCC), which define the annular plane for valve sizing; commissures at the junctions between adjacent cusps ($P_3$: NCC--RCC, $P_4$: RCC--LCC, $P_5$: LCC--NCC); the geometric center of the valve ($P_6$); the membranous septum point ($P_7$), located at the base of the interventricular septum near the NCC--RCC junction, used for membranous septum length (MSL) measurement and pacemaker risk prediction; and the left and right coronary ostia ($P_8$: left coronary ostium, LCO; $P_9$: right coronary ostium, RCO), where the coronary arteries originate from the aortic sinuses, used for coronary obstruction risk assessment.}
+\label{fig:anatomy}
+\end{figure}
+
+% --- Paragraph 1: Clinical background ---
+\IEEEPARstart{T}{ranscatheter} aortic valve implantation (TAVI) has become the standard of care for patients with severe aortic stenosis across all surgical risk categories. Pre-procedural computed tomography (CT) planning requires precise identification of anatomical landmarks on the aortic root to serve two complementary clinical purposes: \emph{anticipating procedural complications} and \emph{guiding device selection}~\cite{Blanke2019_scct_tavi_ct,Ma2023_aortic_landmarks}. While device sizing relies on annular plane measurements derived from hinge-point landmarks, the more safety-critical role of landmarks lies in complication anticipation. Two major complications illustrate this dependence. First, new-onset conduction disturbances (NOCD)---a leading cause of post-TAVI pacemaker implantation---can be predicted by measuring the membranous septum length (MSL), defined as the distance from the membranous septum point to the annular plane~\cite{Hamdan2015_msl_avblock,Maeno2017_pacemaker_tavr}. Second, coronary obstruction---though rare (${\sim}0.66\%$ incidence)---carries a 30-day mortality of up to 40.9\%~\cite{Blanke2019_scct_tavi_ct,Ribeiro2013_coronary_obstruction}; expert consensus guidelines identify a coronary ostium height below 12\,mm from the annular plane as an indicator of increased risk~\cite{Blanke2019_scct_tavi_ct}. Both measurements presuppose accurate localization of the relevant landmarks (Fig.~\ref{fig:anatomy}): hinge points and the membranous septum point for MSL, hinge points and the coronary ostia for coronary height. \textcolor{red}{A reliable, automated system that jointly localizes all clinically relevant aortic root landmarks would therefore support the measurement inputs used in pre-procedural complication assessment.}
+
+% --- Paragraph 2: Existing methods and Gaps 1--2 ---
+Existing deep learning methods for aortic root analysis address these clinical needs only partially. Lalys et al.~\cite{Lalys2019_tavi_segmentation} combined aortic root segmentation with landmark identification for TAVI planning, and Wang et al.~\cite{Wang2023_pretavr_dl} developed a segmentation-based algorithm for comprehensive pre-TAVI CT assessment. Ma et al.~\cite{Ma2023_aortic_landmarks} proposed a two-stage convolutional neural network (CNN) pipeline that detects eight landmarks---including the membranous septum point for NOCD risk prediction---with a mean radial error (MRE) of 2.23\,mm. However, none of these systems provides a comprehensive detection of all the landmarks of interest including coronary ostia. They cover device sizing and partial complication prediction (e.g., NOCD via MSL), but omit the coronary ostia, leaving coronary obstruction risk assessment outside the automated pipeline; moreover, certain landmarks---notably the membranous septum point ($P_7$), which lies at a soft-tissue boundary prone to calcification artifact---remain difficult to detect reliably. A second shared limitation is that they all operate in a fully supervised setting and require complete annotation of the training data---a practical bottleneck, since expert annotation of three-dimensional (3D) CT volumes is time-consuming and requires specialized clinical knowledge, leaving the vast majority of available scans unlabeled.
+
+The annotation bottleneck motivates a shift from fully supervised to semi-supervised methods that can exploit the large pool of unlabeled scans. Semi-supervised learning (SSL) has achieved notable success in medical image segmentation, where consistency regularization~\cite{Tarvainen2017_mean_teacher,Laine2017_temporal_ensembling}, cross pseudo supervision (CPS)~\cite{Chen2021_cps}, and confidence-based filtering~\cite{Sohn2020_fixmatch} effectively leverage unlabeled data. Yet SSL for \emph{landmark detection} remains comparatively under-explored~\cite{Dong2019_teacher_students,Honari2018_ssl_landmarks,Kim2023_hybridmatch}. A fundamental reason is that the error tolerance differs qualitatively: in segmentation, a single mislabeled voxel is absorbed by surrounding correct predictions, whereas in landmark detection, one erroneous point can directly corrupt downstream clinical measurements---\textcolor{red}{for instance, a 3\,mm error in coronary ostium localization may change whether the measured ostium height falls below a clinically relevant reference cutoff.} Ren et al.~\cite{Ren2024_g2lcps} recently introduced CPS into landmark prediction, but their method does not incorporate anatomical structural constraints or address the imaging challenges specific to 3D aortic root CT, such as calcification-induced feature degradation.
+
+% --- Paragraph 3: Technical challenges and Gap 3 ---
+Aortic root CT imaging presents three interrelated technical challenges for landmark detection. First, heavy calcification of the aortic valve and surrounding structures degrades local image features, disproportionately affecting landmarks adjacent to calcified tissue (e.g., the membranous septum point $P_7$). Second, the ten aortic root landmarks exhibit strict anatomical spatial relationships---hinge points define the annular plane, commissures alternate with hinges around the root circumference, and coronary ostia maintain characteristic distances from the annulus---which an individual-landmark detector cannot enforce. Third, detection difficulty varies dramatically across landmarks: center-of-mass landmarks such as $P_6$ are inherently easier than ambiguous soft-tissue landmarks such as $P_7$. Graph neural networks (GNNs)~\cite{Scarselli2009_gnn,Kipf2017_gcn} and topology-aware approaches~\cite{Li2020_structured_landmark,Lang2020_gcn_landmark} can encode structural relationships among landmarks, but in a semi-supervised setting, unreliable pseudo-labels risk propagating errors through the graph's message-passing mechanism. Epistemic uncertainty estimation~\cite{Gal2016_dropout_uncertainty,Kendall2017_uncertainty} can identify unreliable predictions, and uncertainty-guided SSL methods~\cite{Yu2019_uncertainty_aware,Wang2022_u2pl} have shown promise in segmentation. However, existing approaches typically employ uncertainty for a single purpose---either to weight pseudo-labels \emph{or} to modulate features \emph{or} to inform post-hoc refinement---rather than as a coherent control signal that simultaneously coordinates multiple learning modules.
+
+% --- Paragraph 4: Our approach ---
+In this paper, we propose \textbf{T}opological \textbf{R}easoning and \textbf{U}ncertainty-aware \textbf{S}emi-supervised \textbf{T}eaching (\textbf{TRUST}), a semi-supervised framework for 10-landmark aortic root detection that extends prior TAVI landmark pipelines to include the coronary ostia and uses uncertainty-aware topological reasoning to improve reliability under limited annotation. TRUST is designed to address two gaps identified above: incomplete clinical coverage for coronary safety assessment and unreliable pseudo-supervision for anatomically constrained landmark detection. The detailed architecture, uncertainty formulation, and training objectives are described in Section~\ref{sec:method}.
+
+% --- Paragraph 5: Contributions ---
+The main contributions of this paper are as follows:
+\begin{enumerate}
+  \item A 10-landmark TAVI planning framework that extends prior aortic-root landmark detection to include the coronary ostia, enabling both NOCD risk assessment and coronary obstruction screening under label scarcity.
+  \item TRUST, an uncertainty-aware semi-supervised framework that coordinates pseudo-supervision, adaptive feature propagation, and anatomical graph refinement through a unified per-landmark reliability signal.
+  \item Comprehensive evaluation on 150 labeled and 620 unlabeled CT volumes, including per-landmark accuracy, ablation analysis, six clinically meaningful downstream TAVI planning measurements, \textcolor{red}{and a same-test-set full 10-landmark multi-reader analysis with landmark- and measurement-level comparisons}.
+\end{enumerate}
+
+% --- Paragraph 6: Paper organization ---
+The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews related work. Section~\ref{sec:method} details the TRUST methodology. Sections~\ref{sec:experiments} and~\ref{sec:discussion} present experimental results and discussion, respectively. Section~\ref{sec:conclusion} concludes the paper.
+
+% ============================================================================
+\section{Related Work}
+\label{sec:related}
+% ============================================================================
+
+% --- §2.1: TAVI Planning and Aortic Root Landmarking ---
+\subsection{TAVI Planning and Aortic Root Landmarking}
+
+Automated approaches to aortic root analysis have primarily followed segmentation-based or direct landmark-detection pipelines. Lalys et al.~\cite{Lalys2019_tavi_segmentation} proposed automatic aortic root segmentation with subsequent landmark identification for TAVI planning, and Wang et al.~\cite{Wang2023_pretavr_dl} developed a fully automated deep learning algorithm for comprehensive pre-TAVI CT assessment, including risk factor detection. Taking a direct detection approach, Ma et al.~\cite{Ma2023_aortic_landmarks} proposed a two-stage CNN pipeline that detects eight aortic valve landmarks---including the membranous septum point for NOCD risk prediction---achieving an MRE of 2.23\,mm. These systems support device sizing and partial complication prediction, but prior landmark pipelines do not jointly include the coronary ostia for coronary obstruction screening and remain fully supervised. Aortic root landmarks also support procedural guidance: the annular plane orientation derived from hinge points determines the optimal C-arm fluoroscopic angle for valve deployment, reducing contrast usage and radiation exposure~\cite{Gurvitch2010_tavi_angulation,Achenbach2013_annular_plane,Arnold2012_carm_projection}. Our work therefore extends the landmark set to 10 points, incorporating the coronary ostia while operating under semi-supervised conditions to address annotation scarcity.
+
+% --- §2.2: Anatomical Landmark Detection ---
+\subsection{Anatomical Landmark Detection}
+
+Deep learning approaches to anatomical landmark detection broadly follow two strategies: heatmap regression and direct coordinate regression. In heatmap regression, a CNN predicts a spatial probability map for each landmark, with the peak indicating the predicted position. Payer et al.~\cite{Payer2019_integrating_spatial} integrated spatial configuration networks into heatmap regression, using a second-stage network to capture inter-landmark spatial relationships. Newell et al.~\cite{Newell2016_stacked_hourglass} introduced stacked hourglass networks that repeatedly process features through bottom-up and top-down pathways, enabling multi-scale reasoning. High-resolution representation networks (HRNet)~\cite{Sun2019_hrnet} maintain high-resolution features throughout the network, avoiding information loss from downsampling. In direct coordinate regression, approaches such as attention-guided deep regression~\cite{Zhong2019_attention_landmark} predict landmark coordinates through fully connected layers, sometimes enhanced with attention mechanisms.
+
+Three-dimensional medical landmark detection introduces additional challenges, including large volumetric search spaces and anisotropic voxel resolution. Zheng et al.~\cite{Zheng2015_3d_landmark} proposed one of the earliest 3D deep learning pipelines for efficient landmark detection in volumetric data, using a coarse-to-fine strategy. Ghesu et al.~\cite{Ghesu2017_multiscale_landmark} developed robust multi-scale landmark detection that handles incomplete 3D CT data through reinforcement learning-based search. These coarse-to-fine paradigms motivate our two-stage design, where Stage~1 localizes the aortic root region of interest (ROI) before Stage~2 performs fine-grained landmark detection within the cropped volume. Most recently, nnLandmark~\cite{nnLandmark2025} introduced a self-configuring framework for 3D landmark detection built on the nnU-Net training engine, automating hyperparameter selection and preprocessing for general-purpose volumetric landmark tasks.
+
+A common limitation of the above methods is that they treat each landmark independently or with limited pairwise constraints. When landmarks exhibit strong anatomical interdependencies---as in the aortic root, where hinge points, commissures, and coronary ostia maintain fixed topological relationships---independent detection can produce anatomically implausible configurations. This motivates the integration of graph-based structural reasoning (Section~\ref{sec:related_graph}).
+
+% --- §2.3: Semi-Supervised Learning in Medical Imaging ---
+\subsection{Semi-Supervised Learning in Medical Imaging}
+
+Semi-supervised learning aims to leverage unlabeled data alongside a small labeled set. In medical imaging, where expert annotation is expensive, SSL has achieved substantial gains, particularly in segmentation tasks. Core paradigms include consistency regularization, which encourages invariant predictions under input or model perturbations~\cite{Laine2017_temporal_ensembling,Tarvainen2017_mean_teacher}, and pseudo-labeling, which uses confident model predictions as surrogate annotations~\cite{Sohn2020_fixmatch}. CPS~\cite{Chen2021_cps} extends pseudo-labeling to dual-network architectures: two differently initialized networks provide pseudo-labels for each other, reducing confirmation bias inherent in self-training. Variants such as perturbed mean teachers~\cite{Liu2022_perturbed_mean_teacher} and unreliable pseudo-label exploitation~\cite{Wang2022_u2pl} further improve robustness.
+
+Despite these advances, SSL for \emph{landmark detection} is less developed than SSL for segmentation. Prior work has explored semi-supervised facial or generic keypoint localization through auxiliary attributes, teacher--student supervision, semantic representations, and hybrid heatmap--coordinate formulations~\cite{Honari2018_ssl_landmarks,Dong2019_teacher_students,Moskvyak2021_ssl_keypoints,Kim2023_hybridmatch}. More closely related to our setting, Ren et al.~\cite{Ren2024_g2lcps} introduced G2LCPS, bringing CPS to end-to-end landmark prediction with a global-to-local architecture, and Tang et al.~\cite{Tang2025_cbct_ssl} applied SSL to 3D CBCT landmark detection for orthognathic surgery planning. However, SSL for 3D medical landmark detection remains sparse, and existing methods do not address the combined requirements of aortic-root-specific topology, calcification-degraded CT appearance, and downstream TAVI measurements. Moreover, the fundamental error-propagation asymmetry between segmentation and landmark detection---where a single pseudo-label error can directly corrupt downstream clinical measurements---has received limited attention.
+
+% --- §2.4: Graph-Based Structural Reasoning ---
+\subsection{Graph-Based Structural Reasoning for Landmarks}
+\label{sec:related_graph}
+
+GNNs~\cite{Scarselli2009_gnn,Kipf2017_gcn} provide a natural mechanism for encoding structural relationships among landmarks. Battaglia et al.~\cite{Battaglia2018_relational_inductive} formalized the role of relational inductive biases in deep learning, arguing that explicit graph structure enables more data-efficient learning of geometric configurations. In landmark detection, Li et al.~\cite{Li2020_structured_landmark} proposed topology-adapting deep graph learning, where a GCN refines landmark predictions by reasoning over a learned adjacency structure. Lang et al.~\cite{Lang2020_gcn_landmark} applied local attention-based graph convolution to cranio\-maxillo\-facial cone-beam CT (CBCT) landmark localization, achieving improved accuracy through attention-weighted message passing among neighboring landmarks.
+
+These methods demonstrate that enforcing structural coherence among landmarks improves detection accuracy, particularly for landmarks that are individually ambiguous but constrained by their anatomical neighbors. However, they operate in fully supervised settings, where graph inputs are derived from ground-truth or high-quality initial predictions. In a semi-supervised regime, the graph receives noisy pseudo-label-derived coordinates from the teacher, and standard message passing risks propagating errors from unreliable landmarks to their neighbors. TRUST addresses this through uncertainty-gated message passing: the same per-landmark reliability weights that filter pseudo-labels also attenuate the contribution of uncertain landmarks during GCN updates, preventing error propagation through the anatomical graph.
+
+% --- §2.5: Uncertainty Estimation ---
+\subsection{Uncertainty Estimation in Deep Learning}
+
+Uncertainty estimation in deep learning distinguishes between \emph{aleatoric} uncertainty (inherent data noise) and \emph{epistemic} uncertainty (model ignorance due to limited training data)~\cite{Kendall2017_uncertainty}. Epistemic uncertainty, which decreases with more data, is particularly relevant in semi-supervised settings where labeled data is scarce. Common estimation techniques include Monte Carlo (MC) dropout~\cite{Gal2016_dropout_uncertainty}, deep ensembles~\cite{Lakshminarayanan2017_deep_ensembles}, and test-time augmentation (TTA), all of which measure prediction variance under stochastic perturbations.
+
+In semi-supervised medical image analysis, uncertainty has been employed primarily to improve pseudo-label quality. Yu et al.~\cite{Yu2019_uncertainty_aware} proposed an uncertainty-aware self-ensembling model for 3D left atrium segmentation, using MC dropout uncertainty to weight the consistency loss and exclude highly uncertain voxels from training. Wang et al.~\cite{Wang2022_u2pl} further demonstrated that pseudo-labels deemed unreliable by uncertainty can be repurposed as negative learning signals rather than discarded. These works apply uncertainty to a single mechanism (loss weighting or pseudo-label selection) and operate on dense segmentation tasks.
+
+In TRUST, we depart from this single-purpose paradigm by deriving a single per-landmark uncertainty estimate from a cross-student TTA pool---combining within-student TTA-perturbation variance and cross-student disagreement, the latter serving as a model-disagreement proxy rather than a strict epistemic-uncertainty estimate in the Kendall--Gal sense---and routing it as a coordinated training-time control signal to three consumers simultaneously: CPS loss weighting, heat conduction operator (HCO) diffusivity conditioning, and GCN message-passing gating. Rather than treating uncertainty as an isolated heuristic in any one module, this unified design allows the same reliability signal to shape feature extraction, filter pseudo-supervision, and regulate structural refinement in concert.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figs/framework.pdf}
+\caption{Overview of the proposed TRUST framework. \textbf{Stage~1} (top): a coarse detector down-samples the full CT volume and produces a region-of-interest (ROI) center~$p_c$; the ROI is cropped and resampled to $128^3$. \textbf{Stage~2} (middle): two structurally identical student--teacher pairs operate within the ROI space via cross pseudo supervision (CPS; crossed arrows). A cross-student test-time augmentation (TTA) pool aggregates both exponential moving average (EMA) teachers' augmented predictions to produce a unified per-landmark uncertainty $u_k$ and reliability weight $w_k$ (green block). Within each student (blue block), features pass through a 2-cascaded hourglass backbone (HG1, HG2) with uncertainty-guided heat conduction operator (UG-HCO) layers, followed by a heatmap head and an offset head whose outputs are combined for coordinate extraction ($\hat{p}_k$). A topological graph convolutional network (Topo-GCN) refines the coordinates into $p_k^{\mathrm{ref}}$, and the two students' predictions are fused into the final output $p_k^{\mathrm{final}}$. \textbf{Loss functions} (bottom): the total loss comprises supervised heatmap and coordinate regression ($\mathcal{L}_{\mathrm{sup}}$), uncertainty-weighted CPS ($\mathcal{L}_{\mathrm{cps}}$), and topology refinement ($\mathcal{L}_{\mathrm{topo}}$).}
+\label{fig:framework}
+\end{figure*}
+
+% ============================================================================
+\section{Method}
+\label{sec:method}
+% ============================================================================
+
+\subsection{Problem Formulation}
+Given a 3D CT volume $\mathbf{x} \in \mathbb{R}^{D \times H \times W}$, we aim to localize $K=10$ anatomical landmarks of the aortic root,
+\begin{equation}
+\mathcal{Y} = \{p_1, p_2, \ldots, p_K\}, \qquad p_k \in \mathbb{R}^3,
+\end{equation}
+where $p_k$ denotes the 3D coordinate of the $k$-th landmark (we use lowercase~$p_k$ for coordinates and uppercase~$P_k$ as landmark identifiers throughout). Compared with prior pipelines that focus on eight landmarks for valve sizing~\cite{Ma2023_aortic_landmarks}, we additionally include the left coronary ostium (LCO; $P_8$) and right coronary ostium (RCO; $P_9$) to enable coronary height measurement for coronary safety assessment.
+
+We formulate landmark localization as a \emph{heatmap regression} problem. For each landmark $p_k$, the target heatmap $H_k^{*}$ is generated by a 3D Gaussian centered at $p_k$ with standard deviation $\sigma$:
+\begin{equation}
+H_k^{*}(v) = \exp\left(-\frac{\|v - p_k\|^2}{2\sigma^2}\right),
+\label{eq:heatmap}
+\end{equation}
+where $v$ indexes voxels in the heatmap space. During inference, landmark coordinates are obtained from predicted heatmaps via peak localization (e.g., $\arg\max$).
+
+We address this task in a semi-supervised setting with a labeled subset $\mathcal{D}_L = \{(\mathbf{x}_i, \mathcal{Y}_i)\}_{i=1}^{N_L}$ and a large unlabeled subset $\mathcal{D}_U = \{\mathbf{x}_i\}_{i=1}^{N_U}$, where $N_U \gg N_L$. Our goal is to leverage $\mathcal{D}_U$ to improve generalization for 10-landmark localization under limited annotations, especially for visually ambiguous landmarks and the newly introduced coronary ostia.
+
+\subsection{Framework Overview}
+\label{sec:overview}
+
+We propose \textbf{T}opological \textbf{R}easoning and \textbf{U}ncertainty-aware \textbf{S}emi-supervised \textbf{T}eaching (\textbf{TRUST}), a two-stage framework for semi-supervised aortic root landmark detection. Fig.~\ref{fig:framework} illustrates the overall architecture.
+
+\paragraph{Stage~1: ROI proposal.}
+As shown in the top panel of Fig.~\ref{fig:framework}, Stage~1 reuses the cascaded hourglass coarse detector $g_\psi$ of Ma et al.~\cite{Ma2023_aortic_landmarks} verbatim, with no modifications to architecture, training protocol, or hyperparameters. The detector down-samples the full CT volume to $128\times 128\times 128$ at isotropic spacing and predicts approximate coordinates of all $K=10$ landmarks; the ROI center $p_c$ is taken as the centroid of these coarse predictions. The ROI is then cropped and resampled around $p_c$ to a fixed size $\mathbf{x}_{\mathrm{roi}} \in \mathbb{R}^{D' \times H' \times W'}$, within which all subsequent processing takes place. The ROI window is sized to provide a safety margin around the typical aortic root extent that absorbs Stage~1's coarse-detection error before Stage~2 begins.
+
+\paragraph{Stage~2: TRUST.}
+Stage~2 operates entirely within the ROI coordinate space. Two structurally identical student networks, each paired with an exponential moving average (EMA) teacher, are trained via CPS~\cite{Ren2024_g2lcps}: each teacher's heatmap predictions serve as pseudo-labels for the opposite student (Section~\ref{sec:cps}). Within each student, an uncertainty-guided heat conduction operator (UG-HCO) adapts feature propagation by increasing diffusivity for landmarks whose predictions are unreliable, compensating for calcification-induced feature degradation (Section~\ref{sec:ughco}). A lightweight topological graph convolutional network (Topo-GCN) then refines the predicted coordinates by reasoning over the anatomical landmark graph, enforcing structurally plausible configurations (Section~\ref{sec:gcn}). The per-landmark uncertainty that drives these modules during training is estimated once from a cross-student TTA pool that aggregates both teachers' augmented predictions and decomposes via the law of total variance into a within-student TTA-perturbation component and a cross-student disagreement component. The resulting single reliability signal simultaneously weights the CPS loss, conditions UG-HCO diffusivity, and gates GCN message passing (Section~\ref{sec:loss}).
+
+% ---------------------------------------------------------------------------
+\subsection{Cross Pseudo Supervision with Uncertainty Estimation}
+\label{sec:cps}
+
+\paragraph{Dual-network architecture.}
+As depicted in the left portion of Fig.~\ref{fig:framework}, Stage~2 employs two structurally identical student networks, $f_{\theta_1}$ and $f_{\theta_2}$, sharing the same architecture (stacked hourglass, UG-HCO layers, and a Topo-GCN refinement head) but initialized with different random weights. Each student has a corresponding EMA teacher~\cite{Tarvainen2017_mean_teacher}:
+\begin{equation}
+  \theta'_{j,n} = \alpha\,\theta'_{j,n-1} + (1-\alpha)\,\theta_{j,n}, \quad j \in \{1,2\},
+  \label{eq:ema}
+\end{equation}
+where $\alpha$ is the EMA decay rate. All four networks operate on the same ROI crop $\mathbf{x}_{\mathrm{roi}}$ produced by Stage~1.
+
+\paragraph{Cross pseudo supervision.}
+Following Chen et al.~\cite{Chen2021_cps}, adapted to landmark detection by Ren et al.~\cite{Ren2024_g2lcps}, we adopt CPS to exploit unlabeled data. As indicated by the crossed arrows in Fig.~\ref{fig:framework}, on each unlabeled volume, Teacher~1's heatmap predictions serve as pseudo-labels for Student~2, and vice versa:
+\begin{align}
+  \hat{H}^{(T_1)} &= \mathrm{sg}\!\bigl(f_{\theta'_1}(\mathbf{x}_{\mathrm{roi}})\bigr) \;\to\; f_{\theta_2}, \notag\\
+  \hat{H}^{(T_2)} &= \mathrm{sg}\!\bigl(f_{\theta'_2}(\mathbf{x}_{\mathrm{roi}})\bigr) \;\to\; f_{\theta_1},
+  \label{eq:cps_scheme}
+\end{align}
+where $\hat{H}^{(T_j)}$ denotes the stop-gradient heatmap prediction from Teacher~$j$ and $\mathrm{sg}(\cdot)$ is the stop-gradient operator. Because the two students are differently initialized, their errors are partially decorrelated; cross-guidance thus reduces confirmation bias compared to self-training. A deliberate design choice in TRUST is to confine CPS entirely within Stage~2's ROI coordinate space: since CPS relies on heatmap-to-heatmap mean squared error (MSE), both networks must operate at the same spatial resolution and field of view, which is naturally satisfied within the ROI crop.
+
+\paragraph{Epistemic uncertainty estimation via cross-student TTA.}
+To prevent unreliable pseudo-labels from corrupting training---particularly for visually ambiguous landmarks such as $P_7$ under heavy calcification---we estimate per-landmark uncertainty from a \emph{cross-student test-time augmentation (TTA) pool}, as illustrated in the green block of Fig.~\ref{fig:framework}. For each unlabeled volume, both EMA teachers independently produce $T$ heatmap predictions under stochastic augmentations $\{\tau_1, \ldots, \tau_T\}$:
+\begin{equation}
+  \hat{H}_k^{(j,m)} = f_{\theta'_j}\!\bigl(\tau_m(\mathbf{x}_{\mathrm{roi}})\bigr), \quad j\in\{1,2\},\ m = 1, \ldots, T,
+  \label{eq:tta_heatmaps}
+\end{equation}
+yielding coordinates $\hat{p}_k^{(j,m)} = \mathrm{softargmax}\bigl(\hat{H}_k^{(j,m)}\bigr)$. We pool all $2T$ coordinates and define the per-landmark uncertainty as the spatial variance of the pool:
+\begin{equation}
+  u_k = \frac{1}{2T}\sum_{j=1}^{2}\sum_{m=1}^{T}\bigl\|\hat{p}_k^{(j,m)} - \bar{p}_k\bigr\|^2,
+  \quad \bar{p}_k = \frac{1}{2T}\sum_{j,m}\hat{p}_k^{(j,m)}.
+  \label{eq:uncertainty}
+\end{equation}
+By the law of total variance, this pooled quantity admits a principled decomposition into two complementary components:
+\begin{equation}
+  u_k = \underbrace{\tfrac{1}{2}\!\bigl(u_k^{(1)} + u_k^{(2)}\bigr)}_{\text{within-student TTA variance}}
+    \;+\;\underbrace{\tfrac{1}{4}\!\bigl\|\bar{p}_k^{(1)} - \bar{p}_k^{(2)}\bigr\|^2}_{\text{cross-student disagreement}},
+  \label{eq:uncertainty_decomp}
+\end{equation}
+where $u_k^{(j)} = \tfrac{1}{T}\sum_{m}\!\bigl\|\hat{p}_k^{(j,m)} - \bar{p}_k^{(j)}\bigr\|^2$ is the within-teacher TTA variance and $\bar{p}_k^{(j)} = \tfrac{1}{T}\sum_{m}\hat{p}_k^{(j,m)}$ is the mean coordinate of teacher $j$. The first term captures the sensitivity of each teacher's prediction to input perturbations; the second term captures the disagreement between the two teachers' central predictions, which persists because the two students were trained with different initializations and therefore encode residual localization noise along different subspaces. We deliberately avoid labelling these terms as ``aleatoric'' or ``epistemic'' in the strict Kendall--Gal sense~\cite{Kendall2017_uncertainty}: the cross-student disagreement reflects model-disagreement under different initializations rather than a calibrated estimate of model ignorance, and we treat it as a useful empirical reliability proxy rather than a formal epistemic-uncertainty estimate. This decomposition is crucial in practice: under a converged deep heatmap regression model, the soft-argmax output is dominated by a single high-logit voxel, causing the within-student TTA term to saturate and rendering pure TTA-based uncertainty near-uninformative~\cite{Yu2019_uncertainty_aware}. The cross-student disagreement term remains non-trivial and thereby preserves the reliability signal, making the framework robust to overconfident predictions.
+
+We convert the unified uncertainty into a per-landmark reliability weight:
+\begin{equation}
+  w_k = \exp\!\bigl(-\alpha_u \cdot u_k\bigr),
+  \label{eq:weight}
+\end{equation}
+where $\alpha_u > 0$ is a sensitivity hyperparameter (in mm$^{-2}$, rendering the exponent dimensionless). As $u_k \to 0$, $w_k \to 1$ (full trust); as $u_k$ grows, $w_k \to 0$ (suppress). The same unified reliability signal is consumed by three downstream modules, as indicated by the colored arrows emanating from the uncertainty block in Fig.~\ref{fig:framework}: (i)~the CPS loss weighting for pseudo-supervision (Section~\ref{sec:loss}), (ii)~the UG-HCO diffusivity conditioning (Section~\ref{sec:ughco}), and (iii)~the Topo-GCN message-passing gating (Section~\ref{sec:gcn}).
+
+% ---------------------------------------------------------------------------
+\subsection{Uncertainty-Guided Heat Conduction Operator}
+\label{sec:ughco}
+
+Aortic root CT images frequently exhibit low contrast and calcification artifacts, degrading local feature quality for affected landmarks. Standard convolutional backbones process features at fixed receptive-field scales and cannot selectively enhance global context in degraded regions while preserving fine details elsewhere. We address this with UG-HCO, integrated into both Stage~2 student networks as shown in the student pathway of Fig.~\ref{fig:framework} (and consequently inherited by their EMA teachers). UG-HCO adapts the recently proposed heat-conduction-based feature propagation~\cite{wang2025building} by conditioning its diffusivity on the unified per-landmark uncertainty estimated in Section~\ref{sec:cps}.
+
+\paragraph{Heat conduction preliminaries.}
+The heat equation describes the diffusion of a scalar field $\varphi(\mathbf{r}, t)$ over spatial coordinates $\mathbf{r}$ and time~$t$:
+\begin{equation}
+  \frac{\partial \varphi}{\partial t} = \kappa\,\nabla^2 \varphi,
+  \label{eq:heat}
+\end{equation}
+where $\kappa > 0$ is the thermal diffusivity. Applying the Fourier transform yields a frequency-domain ordinary differential equation (ODE),
+\begin{equation}
+  \frac{\mathrm{d}\tilde{\varphi}(\boldsymbol{\omega},t)}{\mathrm{d}t}
+    = -\kappa\,\|\boldsymbol{\omega}\|^2\,\tilde{\varphi}(\boldsymbol{\omega},t),
+  \label{eq:heat_freq}
+\end{equation}
+with closed-form solution
+\begin{equation}
+  \tilde{\varphi}(\boldsymbol{\omega},t)
+    = \tilde{\varphi}_0(\boldsymbol{\omega})\,\exp\!\bigl(-\kappa\,\|\boldsymbol{\omega}\|^2\,t\bigr),
+  \label{eq:heat_sol}
+\end{equation}
+where $\tilde{\varphi}_0(\boldsymbol{\omega})$ is the initial condition in the frequency domain. Intuitively, higher frequencies decay faster, achieving an adaptive low-pass filtering whose strength is controlled by the product~$\kappa t$. Wang et al.~\cite{wang2025building} show that this operation can be implemented efficiently via the discrete cosine transform (DCT) and inverse DCT (IDCT) under Neumann boundary conditions:
+\begin{equation}
+  \mathbf{U}_t = \mathrm{IDCT}\!\bigl(
+    \mathrm{DCT}(\mathbf{U}_0)
+    \odot \exp\!\bigl(-\kappa(\boldsymbol{\omega})\,\|\boldsymbol{\omega}\|^2\,t\bigr)
+  \bigr),
+  \label{eq:dct_hco}
+\end{equation}
+where $\mathbf{U}_0$ is the input feature map and $\kappa(\boldsymbol{\omega})$ is a learned, frequency-adaptive diffusivity predicted from frequency value embeddings (FVE).
+
+\paragraph{Uncertainty-conditioned diffusivity.}
+In vanilla HCO, $\kappa(\boldsymbol{\omega})$ depends only on frequency and is shared across all spatial locations. We extend this by conditioning the diffusivity on the per-landmark uncertainties $\{u_k\}_{k=1}^K$. Specifically, a normalized uncertainty map~$\bar{\mathcal{U}}$ is constructed by placing each normalized uncertainty~$u_k / \max_{k'} u_{k'}$ at the corresponding landmark location in a 3D volume and interpolating to the feature resolution via trilinear interpolation. The uncertainty-conditioned diffusivity is:
+\begin{equation}
+  \kappa(\boldsymbol{\omega}, \mathcal{U})
+    = \kappa_{\mathrm{base}}(\boldsymbol{\omega})\cdot
+      \bigl(1 + \beta\,\bar{\mathcal{U}}\bigr),
+  \label{eq:ughco_diff}
+\end{equation}
+where $\kappa_{\mathrm{base}}(\boldsymbol{\omega})$ is the standard FVE-predicted diffusivity, $\bar{\mathcal{U}}$ is the normalized, spatially broadcast uncertainty map, and $\beta$ is a learnable scaling parameter. The effect is intuitive: in regions where the teacher is uncertain (high~$\bar{\mathcal{U}}$, e.g., calcified areas around~$P_7$), diffusivity increases, promoting stronger global-context propagation that compensates for degraded local features. In confident regions (low~$\bar{\mathcal{U}}$), diffusivity remains close to the baseline, preserving fine-grained local detail. The UG-HCO layer replaces a standard convolutional block within the backbone and is trained end-to-end:
+\begin{equation}
+  \mathbf{U}_t = \mathrm{IDCT}\!\bigl(
+    \mathrm{DCT}(\mathbf{U}_0)
+    \odot \exp\!\bigl(-\kappa(\boldsymbol{\omega}, \mathcal{U})\,\|\boldsymbol{\omega}\|^2\,t\bigr)
+  \bigr).
+  \label{eq:ughco_layer}
+\end{equation}
+For 3D CT volumes, we employ the three-dimensional DCT, extending the formulation naturally to volumetric data.
+
+% ---------------------------------------------------------------------------
+\subsection{Topological Reasoning via Graph Refinement}
+\label{sec:gcn}
+
+Initial landmark predictions from the backbone may violate anatomical plausibility---for instance, predicting~$P_7$ outside the aortic root boundary due to calcification artifacts. As shown at the end of each student pathway in Fig.~\ref{fig:framework}, both Stage~2 students include a lightweight \emph{Topo-GCN} refinement head that enforces structural coherence by reasoning over the anatomical landmark graph~\cite{Li2020_structured_landmark}. Importantly, CPS supervision is applied at the heatmap level (before the GCN), so the GCN refines coordinates without coupling graph structure into the pseudo-label alignment.
+
+\paragraph{Graph construction.}
+We define a fixed graph $\mathcal{G} = (\mathcal{V}, \mathcal{E})$ with $|\mathcal{V}| = K = 10$ nodes. Edges~$\mathcal{E}$ encode anatomical connectivity via a binary adjacency matrix~$A$: the aortic center~$P_6$ connects to all other landmarks; hinge points~$P_0$--$P_2$ and commissures~$P_3$--$P_5$ form the annular ring; each coronary ostium ($P_8$, $P_9$) connects to its nearest hinge and commissure pair; and the membranous septum point~$P_7$ connects to its anatomically adjacent landmarks ($P_0$, $P_1$, $P_3$, $P_6$). Each node receives an initial feature through a multilayer perceptron (MLP):
+\begin{equation}
+  \mathbf{h}_k^{(0)} = \mathrm{MLP}_{\mathrm{in}}\!\bigl(\hat{p}_k\bigr) \in \mathbb{R}^{d_h},
+  \label{eq:node_init}
+\end{equation}
+where $\hat{p}_k \in \mathbb{R}^3$ is the coordinate obtained from the backbone heatmap via differentiable soft-argmax and $d_h = 64$ is the hidden dimension.
+
+\paragraph{Uncertainty-gated message passing.}
+The GCN consists of $L = 4$ layers (${\sim}$32K parameters). At each layer, node features are updated as:
+\begin{equation}
+  \mathbf{h}_k^{(l+1)} = \sigma_{\mathrm{act}}\!\left(
+    \sum_{i \in \mathcal{N}(k)} \tilde{A}_{ki}\,w_i\,
+      \mathbf{W}^{(l)}\,\mathbf{h}_i^{(l)}
+    + \mathbf{W}_e^{(l)}\,\mathbf{e}_{ki}
+  \right),
+  \label{eq:gcn_mp}
+\end{equation}
+where $\tilde{A}_{ki}$ is the $(k,i)$-entry of the degree-normalized adjacency matrix with self-loops, $w_i$ is the unified reliability weight from~\eqref{eq:weight} shared by both students' GCN updates, $\mathbf{W}^{(l)}$ and $\mathbf{W}_e^{(l)}$ are learnable weight matrices, $\mathbf{e}_{ki} = \mathrm{MLP}_e(\hat{p}_k - \hat{p}_i)$ encodes relative position between connected landmarks, and $\sigma_{\mathrm{act}}(\cdot)$ is a rectified linear unit (ReLU) activation. The reliability gating ensures that landmarks with high uncertainty (e.g., $P_7$ under calcification) contribute less to their neighbors' updates, while accurately detected landmarks such as $P_6$ (center, typically low error) and $P_0$--$P_2$ (hinge points) serve as reliable anchors.
+
+\paragraph{Gated residual coordinate correction.}
+After $L$ GCN layers, we predict a residual coordinate offset with a learned gate:
+\begin{align}
+  \Delta p_k &= \mathrm{MLP}_{\mathrm{out}}\!\bigl(\mathbf{h}_k^{(L)}\bigr), \quad
+  \gamma_k = \sigma_{\mathrm{gate}}\!\bigl(\mathbf{h}_k^{(L)}\bigr), \notag\\
+  p_k^{\mathrm{ref}} &= \hat{p}_k + \gamma_k \odot \Delta p_k,
+  \label{eq:residual}
+\end{align}
+where $\gamma_k \in (0,1)^3$ is a per-coordinate gate and $p_k^{\mathrm{ref}}$ is the refined coordinate. The residual formulation ensures that the GCN learns small corrections rather than absolute positions, and the gate allows the network to selectively apply or suppress refinement per coordinate axis. The entire pipeline---soft-argmax, GCN, and residual correction---is differentiable, enabling end-to-end training with gradients flowing back into the backbone.
+
+% ---------------------------------------------------------------------------
+\subsection{Loss Functions and Training}
+\label{sec:loss}
+
+\paragraph{Supervised loss.}
+On labeled data $\mathcal{D}_L$, each student~$j \in \{1,2\}$ minimizes a combination of heatmap regression and coordinate regression losses:
+\begin{equation}
+  \mathcal{L}_{\mathrm{sup}}^{(j)} = \frac{1}{K}\sum_{k=1}^{K}\Bigl(
+    \bigl\|H_k^{(j)} - H_k^*\bigr\|^2
+    + \lambda_p \bigl\|\hat{p}_k^{(j)} - p_k\bigr\|_1\Bigr),
+  \label{eq:loss_sup}
+\end{equation}
+where $H_k^{(j)}$ is the predicted heatmap of Student~$j$, $H_k^*$ is the Gaussian ground-truth heatmap from~\eqref{eq:heatmap}, $\hat{p}_k^{(j)}$ is the predicted coordinate (via soft-argmax), and $p_k$ is the ground-truth coordinate.
+
+\paragraph{Uncertainty-weighted CPS loss.}
+On unlabeled data $\mathcal{D}_U$, CPS enforces heatmap consistency between each student and the opposite teacher, weighted by the pseudo-label-producing teacher's reliability:
+\begin{align}
+  \mathcal{L}_{\mathrm{cps}} = \frac{1}{K}\sum_{k=1}^{K} w_k \Bigl(&
+    \bigl\|H_k^{(2)} - \hat{H}_k^{(T_1)}\bigr\|^2 \notag\\
+    &+ \bigl\|H_k^{(1)} - \hat{H}_k^{(T_2)}\bigr\|^2
+  \Bigr),
+  \label{eq:loss_cps}
+\end{align}
+where $\hat{H}_k^{(T_j)}$ is Teacher~$j$'s stop-gradient heatmap prediction~\eqref{eq:cps_scheme} and $w_k$ is the unified reliability weight from~\eqref{eq:weight}. CPS is computed at the heatmap level, prior to the Topo-GCN, ensuring stable same-space supervision. The uncertainty weighting reduces the influence of noisy pseudo-labels for landmarks with high overall pool variance.
+
+\paragraph{Topology refinement loss.}
+For labeled samples, we supervise the GCN-refined coordinates of both students:
+\begin{equation}
+  \mathcal{L}_{\mathrm{topo}}^{(j)} = \frac{1}{K}\sum_{k=1}^{K}
+    \bigl\|p_k^{\mathrm{ref},(j)} - p_k\bigr\|_1, \quad j \in \{1,2\}.
+  \label{eq:loss_topo}
+\end{equation}
+
+\paragraph{Total loss.}
+The overall training objective for Stage~2 combines all terms:
+\begin{equation}
+  \mathcal{L}_{\mathrm{total}} = \sum_{j=1}^{2}\mathcal{L}_{\mathrm{sup}}^{(j)}
+    + \lambda_c\,\rho(n)\,\mathcal{L}_{\mathrm{cps}}
+    + \lambda_t\sum_{j=1}^{2}\mathcal{L}_{\mathrm{topo}}^{(j)},
+  \label{eq:loss_total}
+\end{equation}
+where $\lambda_c$ and $\lambda_t$ are balancing coefficients, and $\rho(n) = \exp\!\bigl(-5(1 - n/n_{\max})^2\bigr)$ is a Gaussian ramp-up function that gradually increases the CPS weight over training epoch~$n$~\cite{Tarvainen2017_mean_teacher}.
+
+\paragraph{Training procedure.}
+Training proceeds in three phases:
+\begin{enumerate}
+  \item \emph{Stage~1 pretraining.} The ROI proposal network $g_\psi$ is trained on $\mathcal{D}_L$ with a supervised landmark loss.
+  \item \emph{Stage~2 warm-up.} Both students are trained on $\mathcal{D}_L$ using $\mathcal{L}_{\mathrm{sup}}^{(j)} + \lambda_t\,\mathcal{L}_{\mathrm{topo}}^{(j)}$ for $N_{\mathrm{warm}}$ epochs. EMA teachers are initialized as copies of their respective students.
+  \item \emph{Stage~2 main phase.} Each iteration samples a labeled mini-batch from $\mathcal{D}_L$ and an unlabeled mini-batch from $\mathcal{D}_U$. Each teacher produces $T$ stochastic predictions for uncertainty estimation (Section~\ref{sec:cps}), all loss terms in~\eqref{eq:loss_total} contribute to the student updates, and both teachers are updated via EMA~\eqref{eq:ema}.
+\end{enumerate}
+At inference, Stage~1 produces the ROI crop. Both Stage~2 students process the ROI independently, each yielding refined coordinates $p_k^{\mathrm{ref},(j)}$ via its Topo-GCN, and the cross-student TTA pool jointly provides the pool-level coordinate mean $\bar{p}_k$ together with the decomposition~\eqref{eq:uncertainty_decomp}. As illustrated on the right side of Fig.~\ref{fig:framework}, we fuse the two students' predictions using weights derived from the within-student components:
+\begin{equation}
+  p_k^{\mathrm{final}} = \frac{\tilde{w}_k^{(1)}\,p_k^{\mathrm{ref},(1)} + \tilde{w}_k^{(2)}\,p_k^{\mathrm{ref},(2)}}{\tilde{w}_k^{(1)} + \tilde{w}_k^{(2)}},
+  \quad \tilde{w}_k^{(j)} = \exp\!\bigl(-\alpha_u\,u_k^{(j)}\bigr),
+  \label{eq:fusion}
+\end{equation}
+so that each student's prediction is weighted inversely to its own within-teacher TTA variance. The fused coordinates are reprojected to the original physical coordinate space for clinical measurements (e.g., coronary height, MSL).
+
+% ============================================================================
+\section{Experiments}
+\label{sec:experiments}
+% ============================================================================
+
+% ---------------------------------------------------------------------------
+\subsection{Dataset and Evaluation Metrics}
+\label{sec:dataset}
+
+\paragraph{Dataset.}
+We evaluate TRUST on a dataset of 770 pre-procedural cardiac CT volumes acquired at Rennes University Hospital. All patients underwent electrocardiographically gated contrast-enhanced CT as part of the pre-operative TAVI assessment. Each volume comprises $512 \times 512$-pixel slices with in-plane pixel spacing ranging from 0.225 to 0.492\,mm and slice thickness from 0.500 to 0.750\,mm. Of the 770 volumes, 150 are annotated with $K = 10$ landmark coordinates by a trained clinician and constitute the labeled subset $\mathcal{D}_L$. The original eight landmarks ($P_0$--$P_7$) follow the annotation protocol of Ma et al.~\cite{Ma2023_aortic_landmarks}; we extend this to include the left and right coronary ostia ($P_8$, $P_9$), enabling automated coronary height measurement. The remaining 620 unannotated volumes form the unlabeled subset $\mathcal{D}_U$ and were acquired under the same imaging protocol. Within $\mathcal{D}_L$, we adopt the same split as~\cite{Ma2023_aortic_landmarks}: 100 volumes for training, 20 for validation, and 30 for testing. All 620 unlabeled volumes are used during Stage~2 training. \textcolor{red}{The original test annotations are denoted Reader~A1. To contextualize model performance against annotation variability, the same 30-case test set received an independent full 10-landmark annotation from Reader~B and a repeat annotation from the original reader (Reader~A2).}
+
+
+\paragraph{Evaluation metrics.}
+We adopt two standard metrics for landmark detection:
+\begin{itemize}
+  \item \textbf{Mean Radial Error (MRE)}: the Euclidean distance (in mm) between the predicted and ground-truth coordinates, reported per landmark and averaged over the full landmark set.
+  \item \textbf{Success Detection Rate (SDR)}: the percentage of landmarks localized within a distance threshold~$r$. We report SDR at $r \in \{2.0,\, 2.5,\, 3.0,\, 4.0\}$\,mm, following~\cite{Ma2023_aortic_landmarks}.
+\end{itemize}
+Beyond these standard detection metrics, we evaluate the clinical relevance of the predictions by assessing downstream measurement agreement between ground-truth and predicted landmarks (Section~\ref{sec:experiments}). \textcolor{red}{For the additional multi-reader analysis, we report MRE over $P_0$--$P_7$, all 10 landmarks, and the coronary ostia $P_8$--$P_9$, together with full-set SDR and outlier counts. We also compare MSL, three-hinge circumdiameter and circular area, coronary heights, annular-plane orientation, and total DLZ calcification. Pairwise results are reported for Reader~B versus Reader~A2 and for TRUST versus each additional annotation; TRUST versus Reader~A1 corresponds to the primary evaluation above and is not duplicated.}
+
+% ---------------------------------------------------------------------------
+\subsection{Implementation Details}
+\label{sec:implementation}
+
+All experiments are implemented in PyTorch and conducted on an NVIDIA RTX A6000 graphics processing unit (GPU; 48\,GB). Both detection stages use a 2-cascaded hourglass backbone~\cite{Newell2016_stacked_hourglass} with 3D--2D fusion convolutional layers (initial 16 kernels, instance normalization), taking $128 \times 128 \times 128$ input volumes and producing $32 \times 32 \times 32$ heatmaps (downsampling factor of~4). The Gaussian heatmap standard deviation is $\sigma = \lfloor\log_2 32\rfloor + 1 = 6$ voxels. Intensity values are clipped to the [0.5, 99.5] percentile range and normalized to zero mean and unit standard deviation.
+
+\paragraph{Stage~1 (ROI proposal).}
+Following Ma et al.~\cite{Ma2023_aortic_landmarks}, the raw volume is resampled to isotropic spacing (median voxel spacing of the dataset) via cubic spline interpolation, then down-sampled to $128 \times 128 \times 128$. The coarse detector is trained for 500 epochs with Adam (learning rate $10^{-2}$, decayed by 0.9 every 80 epochs). On the 30-volume test set, Stage~1 achieves an overall MRE of $6.74 \pm 5.12$\,mm, comparable to the $6.19 \pm 3.52$\,mm reported by Ma et al.\ on the original 8-landmark task~\cite{Ma2023_aortic_landmarks}. The cropped ROI retains 298 of 300 ground-truth landmarks (99.3\%), with the 2 remaining landmarks displaced outside the cropping window by gross Stage 1 outliers; these residual cases are discussed in Section~\ref{sec:discussion}.
+
+\paragraph{Stage~2 (TRUST).}
+The ROI is cropped from the isotropic volume at $128 \times 128 \times 128$ around the Stage~1 predicted center, with a training-time augmentation strategy of 80\% random crops and 20\% center crops. Both students are initialized with different random seeds. We first warm up for $N_{\mathrm{warm}} = 50$ epochs on $\mathcal{D}_L$ only, then train for 950 additional epochs with the full loss~\eqref{eq:loss_total}. The optimizer is Adam with an initial learning rate of $10^{-3}$ and a step-decay schedule (factor 0.9 every 200 epochs). The EMA decay rate is $\alpha = 0.999$. Each training iteration samples one labeled and one unlabeled mini-batch. For TTA-based uncertainty estimation, we apply $T = 5$ stochastic augmentations (random affine transforms and intensity jittering). Loss coefficients are $\lambda_c = 1.5$ and $\lambda_t = 0.5$; the uncertainty sensitivity parameter is $\alpha_u = 1.0$\,mm$^{-2}$. On-the-fly data augmentation consists of random voxel intensity jittering and Gaussian blurring, each applied with 50\% probability. The Topo-GCN uses $L = 4$ layers with hidden dimension $d_h = 64$.
+
+\paragraph{Model complexity.}
+Each student network contains 69.6M parameters, of which UG-HCO and Topo-GCN contribute only 13.5K and 26.3K additional parameters, respectively. During training, TRUST maintains two student--teacher pairs (four networks totaling 278.4M parameters), with 139.2M trainable parameters (two students); the two EMA teachers share the same architecture but do not compute gradients. At inference, both students and their EMA teachers participate in producing the fused prediction~\eqref{eq:fusion}: each student performs one clean Stage-2 forward pass to yield $p_k^{\mathrm{ref},(j)}$, and each EMA teacher performs $T=5$ augmented forward passes to yield the within-student TTA variance $u_k^{(j)}$. With per-teacher TTA augmentations batched together, the full pipeline processes one volume in approximately 250\,ms ($\sim$4 frames per second, FPS) on an NVIDIA RTX A6000.
+
+% ---------------------------------------------------------------------------
+\subsection{Comparison with State-of-the-Art}
+\label{sec:comparison}
+
+We compare TRUST against four fully supervised landmark detection methods to demonstrate that semi-supervised learning with unlabeled data can match or exceed fully supervised performance:
+(i)~\textbf{3D U-Net}~\cite{Cicek2016_3dunet}: a standard volumetric encoder--decoder architecture for heatmap regression;
+(ii)~\textbf{SCN}~\cite{Payer2019_integrating_spatial}: SpatialConfiguration-Net, which augments heatmap regression with a second-stage spatial configuration module that captures inter-landmark relationships;
+(iii)~\textbf{nnLandmark}~\cite{nnLandmark2025}: a recent self-configuring 3D landmark detection framework built on the nnU-Net training engine;
+(iv)~\textbf{Ma et al.}~\cite{Ma2023_aortic_landmarks}: the two-stage fully supervised pipeline originally proposed for 8 aortic valve landmarks; we retrain their model on our 10-landmark dataset using the same architecture and training protocol.
+All four baselines are integrated into our two-stage pipeline as Stage~2 backbone replacements and trained on $\mathcal{D}_L$ only, ensuring that the only difference from TRUST is the detection architecture and the absence of unlabeled data. Comparisons against semi-supervised baselines---Mean Teacher~\cite{Tarvainen2017_mean_teacher} and CPS~\cite{Chen2021_cps,Ren2024_g2lcps}---are reported as Rows~2 and~3 of the cumulative ablation in Section~\ref{sec:ablation}, where the two SSL methods share the same backbone and training pipeline as TRUST so that the contribution of our uncertainty-aware design is not confounded with architectural differences.
+
+\begin{table}[t]
+\centering
+\caption{Comparison with fully supervised methods on the test set (30 volumes). Top: 10-landmark evaluation; bottom: 8-landmark evaluation (excluding coronary ostia $P_8$, $P_9$). Best results in \textbf{bold}. $^\dagger$Results from~\cite{Ma2023_aortic_landmarks}. All SDR cells carry 95\% Clopper--Pearson binomial confidence intervals (CIs; computed treating each case--landmark trial as independent) with half-widths of at most $\pm$5.8 percentage points ($n = 300$ trials per cell for 10-landmark; $n = 240$ for 8-landmark); selected non-overlapping CIs are quoted in the text.}
+\label{tab:comparison}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{l c c c c c}
+\toprule
+\multirow{2}{*}{Method} & \multirow{2}{*}{MRE (mm)$\downarrow$} & \multicolumn{4}{c}{SDR (\%)$\uparrow$} \\
+\cmidrule(lr){3-6}
+ & & \scriptsize 2.0\,mm & \scriptsize 2.5\,mm & \scriptsize 3.0\,mm & \scriptsize 4.0\,mm \\
+\midrule
+nnLandmark           & 8.62$\pm$5.13 & 5.00  & 5.67  & 8.00  & 18.00 \\
+3D U-Net             & 4.44$\pm$2.91 & 21.00 & 29.33 & 33.67 & 54.00 \\
+SCN                  & 3.12$\pm$2.05 & 33.33 & 47.67 & 58.67 & 75.00 \\
+Ma et al.            & 2.79$\pm$1.68 & 39.00 & 51.00 & 64.00 & 80.33 \\
+\midrule
+\textbf{TRUST (ours)} & \textbf{2.19$\pm$1.22} & \textbf{50.67} & \textbf{67.00} & \textbf{77.33} & \textbf{92.33} \\
+\midrule
+\addlinespace[5pt]
+\midrule
+\multicolumn{6}{l}{\emph{8-landmark evaluation (excluding $P_8$, $P_9$)}} \\
+\midrule
+Ma et al.$^\dagger$ (8\,pts) & 2.23$\pm$1.35 & 47.90 & 65.00 & 77.50 & 89.17 \\
+\textbf{TRUST (ours, 8\,pts)} & \textbf{2.07$\pm$0.98} & \textbf{57.08} & \textbf{68.33} & \textbf{82.92} & \textbf{96.25} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:comparison} summarizes the results. Among the fully supervised baselines trained on our 10-landmark task, SCN achieves the best performance (MRE 3.12$\pm$2.05\,mm), benefiting from its second-stage spatial configuration module that captures inter-landmark relationships. 3D U-Net, lacking any structural reasoning, yields a substantially higher MRE of 4.44\,mm. nnLandmark performs poorly on this task (MRE 8.62\,mm), likely because its self-configuring pipeline---designed for general-purpose landmark detection---does not adapt well to the compact, densely packed anatomy of the aortic root where all 10 landmarks reside within a small spatial extent.
+
+TRUST achieves an MRE of 2.19$\pm$1.22\,mm and an SDR$_{2.0}$ of 50.67\% (95\% CI [44.9, 56.5]), outperforming all fully supervised baselines despite using the same labeled training set. Compared to Ma et al.~\cite{Ma2023_aortic_landmarks}---the strongest supervised baseline, which shares the same backbone architecture and training protocol---TRUST reduces MRE by 21.5\% (2.79$\to$2.19\,mm) and improves SDR$_{2.0}$ from 39.00\% (95\% CI [33.4, 44.8]) to 50.67\% (+11.67 percentage points; non-overlapping intervals), demonstrating that leveraging 620 unlabeled volumes through uncertainty-aware semi-supervised learning yields substantial gains over purely supervised approaches. Compared to SCN, the strongest alternative architecture, the improvement is even larger: MRE decreases by 29.8\% (3.12$\to$2.19\,mm) and SDR$_{2.0}$ increases by 17.34 percentage points. The lower standard deviation (1.22 vs.\ 1.68\,mm for Ma et al.) further indicates that TRUST produces more consistent predictions across landmarks and patients. We note that the 21.5\% reduction is computed against a fully supervised baseline that does not exploit the unlabeled pool; the corresponding gain over a same-backbone, same-data-budget vanilla CPS configuration (Row~3 of Table~\ref{tab:ablation}, MRE 2.55\,mm) is 14.1\%, isolating the contribution of our uncertainty-aware design from both the backbone choice and the SSL paradigm itself.
+
+To enable a direct comparison with the original results reported by Ma et al.~\cite{Ma2023_aortic_landmarks}, we also evaluate TRUST on the original 8-landmark subset (excluding coronary ostia $P_8$, $P_9$). As shown in the lower portion of Table~\ref{tab:comparison}, TRUST achieves an MRE of 2.07$\pm$0.98\,mm on 8 landmarks, reducing the error by 7.2\% relative to the original Ma et al.\ result (2.23$\pm$1.35\,mm) while improving SDR$_{2.0}$ from 47.90\% (95\% CI [41.4, 54.4]) to 57.08\% (95\% CI [50.6, 63.4]) and SDR$_{4.0}$ from 89.17\% (95\% CI [84.5, 92.8]) to 96.25\% (95\% CI [93.0, 98.3]). Since this evaluation uses the same 8-landmark definition and test split as Ma et al., the comparison is directly interpretable; the slightly overlapping SDR$_{2.0}$ intervals suggest that the strongest evidence comes from the combined pattern of lower MRE, higher SDR$_{4.0}$, and lower standard deviation. The lower standard deviation (0.98 vs.\ 1.35\,mm) further indicates that TRUST produces more consistent predictions across landmarks and patients.
+
+% ---------------------------------------------------------------------------
+\subsection{Ablation Study}
+\label{sec:ablation}
+
+To isolate the contribution of each component, we conduct a cumulative ablation starting from a supervised-only baseline and progressively adding modules. The ordering is designed to introduce vanilla architectural components (HCO, Topo-GCN) before activating the unified uncertainty mechanism that conditions all three modules, isolating the contribution of \emph{uncertainty as a coordinated control signal} from that of the underlying architectural blocks. The consumer sub-ablation in Table~\ref{tab:ablation_uncertainty} further decomposes the uncertainty contribution across its three consumers. All variants use the same backbone and training schedule; only the semi-supervised components differ. Table~\ref{tab:ablation} reports results on the test set.
+
+(i)~\textbf{Supervised-only}: a single student network trained on $\mathcal{D}_L$ without any unlabeled data, establishing the lower bound;
+(ii)~\textbf{+ Mean Teacher}: a single student--teacher pair with EMA-based consistency regularization on $\mathcal{D}_U$~\cite{Tarvainen2017_mean_teacher};
+(iii)~\textbf{+ CPS}: dual student--teacher pairs with CPS on heatmaps~\cite{Chen2021_cps,Ren2024_g2lcps}, replacing the single-network Mean Teacher;
+(iv)~\textbf{+ HCO (vanilla)}: heat conduction feature propagation~\cite{wang2025building} integrated into both students, with frequency-only diffusivity (no uncertainty conditioning);
+(v)~\textbf{+ Topo-GCN (vanilla)}: anatomical graph refinement head added on top, with uniform message passing (no uncertainty gating);
+(vi)~\textbf{+ Unified Uncertainty (full TRUST)}: the same TTA-based uncertainty estimate~\eqref{eq:uncertainty} simultaneously weights the CPS loss, conditions HCO diffusivity (UG-HCO), and gates Topo-GCN message passing.
+
+\begin{table}[t]
+\centering
+\caption{Cumulative ablation study on the test set (10 landmarks). Each row adds one component to the previous configuration. $\Delta$MRE is the incremental improvement over the previous row.}
+\label{tab:ablation}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l c c c c}
+\toprule
+Configuration & MRE (mm)$\downarrow$ & \scriptsize SDR$_{2.0}$ & \scriptsize SDR$_{4.0}$ & $\Delta$MRE \\
+\midrule
+Supervised-only           & 2.79$\pm$1.68 & 39.00 & 80.33 & ---     \\
++ Mean Teacher            & 2.65$\pm$1.58 & 43.00 & 83.00 & $-$0.14 \\
++ CPS                     & 2.55$\pm$1.50 & 45.67 & 84.67 & $-$0.10 \\
++ HCO (vanilla)           & 2.49$\pm$1.54 & 47.33 & 85.67 & $-$0.06 \\
++ Topo-GCN (vanilla)      & 2.46$\pm$1.58 & 48.00 & 86.00 & $-$0.03 \\
+\midrule
+\textbf{+ Unified Uncertainty} & \textbf{2.19$\pm$1.22} & \textbf{50.67} & \textbf{92.33} & \textbf{$-$0.27} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:ablation} reveals two key observations. First, the SSL components (Mean Teacher and CPS) contribute the largest individual gains in the early stages ($-$0.14 and $-$0.10\,mm respectively), confirming that leveraging unlabeled data is the primary driver of improvement once a strong supervised baseline is in place. Second, the vanilla architectural additions---HCO and Topo-GCN without uncertainty---yield only marginal incremental improvements ($-$0.06 and $-$0.03\,mm) and even produce a slight increase in standard deviation (+0.04\,mm each), suggesting that simply stacking sophisticated feature-propagation and graph-refinement modules is insufficient: without a reliability signal, these modules cannot selectively attend to trustworthy evidence and may even amplify noise from unreliable pseudo-labels. The decisive jump comes from activating the unified uncertainty mechanism in the final row ($-$0.27\,mm), which simultaneously reduces the standard deviation by 0.36\,mm---the largest variance reduction across all configurations. This single addition exceeds the combined MRE contribution of vanilla HCO and vanilla Topo-GCN by a factor of three and reverses their adverse effect on prediction variance. The result confirms TRUST's central design principle: the same uncertainty signal must condition feature extraction, gate graph message passing, and weight pseudo-supervision \emph{in concert} to fully realize the potential of the underlying architectural components.
+
+\paragraph{Where does uncertainty matter most?}
+The main ablation in Table~\ref{tab:ablation} shows that unifying uncertainty across all three consumers yields the largest single-step improvement, but it does not reveal whether this gain is driven predominantly by one consumer or by their coordinated use. To disentangle the contribution of each uncertainty consumer, we start from the ``Topo-GCN (vanilla)'' configuration of Table~\ref{tab:ablation}---in which HCO, Topo-GCN, and CPS are all present but no component receives the uncertainty signal---and progressively activate the uncertainty consumers in two complementary subsets. Table~\ref{tab:ablation_uncertainty} reports the results.
+
+\begin{table}[t]
+\centering
+\caption{Uncertainty consumer sub-ablation. Starting from the no-uncertainty configuration (Row 5 of Table~\ref{tab:ablation}), we selectively activate the uncertainty signal in different subsets of consumers: the CPS loss weighting, the UG-HCO diffusivity and Topo-GCN message-passing gating, or all three simultaneously. Unc. denotes uncertainty, and std denotes standard deviation; $\Delta$MRE and $\Delta$std are computed relative to the no-uncertainty configuration.}
+\label{tab:ablation_uncertainty}
+\setlength{\tabcolsep}{2pt}
+\small
+\begin{tabular}{l c c c c c}
+\toprule
+Configuration & MRE (mm)$\downarrow$ & \scriptsize SDR$_{2.0}$ & \scriptsize SDR$_{4.0}$ & $\Delta$MRE & $\Delta$std \\
+\midrule
+No uncertainty              & 2.46$\pm$1.58 & 48.00 & 86.00 & ---     & ---     \\
+Unc.\,$\to$\,CPS only       & 2.41$\pm$1.52 & 49.33 & 87.00 & $-$0.05 & $-$0.06 \\
+Unc.\,$\to$\,HCO\,+\,GCN    & 2.35$\pm$1.55 & 51.00 & 88.00 & $-$0.11 & $-$0.03 \\
+\midrule
+\textbf{Unc.\,$\to$\,All three}  & \textbf{2.19$\pm$1.22} & \textbf{50.67} & \textbf{92.33} & \textbf{$-$0.27} & \textbf{$-$0.36} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Two findings stand out. First, activating uncertainty in any subset of consumers already improves over the no-uncertainty baseline, but with strikingly different magnitudes: weighting the CPS loss alone yields a modest $-$0.05\,mm, whereas feeding the same uncertainty into UG-HCO and Topo-GCN alone more than doubles that gain ($-$0.11\,mm). This asymmetry indicates that, in our framework, uncertainty is more valuable as a \emph{feature-level} control signal---reshaping what each student sees and how it aggregates structural context---than as a \emph{supervision-level} filter on pseudo-labels. Second, the full configuration ($-$0.27\,mm) substantially exceeds the sum of the two subsets ($-$0.05 $+$ ($-$0.11) $=$ $-$0.16\,mm), and simultaneously achieves the largest variance reduction ($-$0.36\,mm in standard deviation). The complementary effects across the three consumers, together with the concurrent variance compression, support the ``estimate once, consume thrice'' design: the same uncertainty estimate must flow through all three consumers for the framework to reach its full potential.
+
+\paragraph{Uncertainty source decomposition.}
+To validate the law-of-total-variance decomposition~\eqref{eq:uncertainty_decomp}, we train three TRUST variants that differ only in which component of $u_k$ drives the three consumers: (a)~within-student TTA variance only, (b)~between-student disagreement only, and (c)~the pooled total variance (default). Table~\ref{tab:unc_source} reports detection performance alongside the per-case Pearson correlation between each uncertainty source and the localization error.
+
+\begin{table}[t]
+\centering
+\caption{Uncertainty source sub-ablation. Each row uses a different component of the decomposition~\eqref{eq:uncertainty_decomp} as the uncertainty signal for all three consumers. $r$: per-case Pearson correlation between uncertainty and localization error ($N = 300$ case-landmark pairs). $\bar{u}$: mean uncertainty value across the test set.}
+\label{tab:unc_source}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{l c c c c c}
+\toprule
+Source & MRE (mm)$\downarrow$ & \scriptsize SDR$_{2.0}$ & \scriptsize SDR$_{4.0}$ & $r$ & $\bar{u}$ \\
+\midrule
+(a) Within only      & 2.36$\pm$1.62 & 51.6 & 87.9 & 0.154 & 0.006 \\
+(b) Between only     & 2.34$\pm$1.48 & 49.5 & 91.1 & 0.278 & 1.343 \\
+\midrule
+\textbf{(c) Pooled}  & \textbf{2.19$\pm$1.22} & \textbf{50.7} & \textbf{92.3} & 0.243 & 0.356 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three findings emerge. First, the within-student TTA variance produces near-zero uncertainty values ($\bar{u} = 0.006$) and a weak per-case correlation ($r = 0.154$), confirming the soft-argmax saturation phenomenon described in Section~\ref{sec:cps}: the converged heatmap logits are large enough to render TTA-based perturbations uninformative. Second, the between-student disagreement provides a substantially stronger signal ($\bar{u} = 1.343$, $r = 0.278$), validating its role as the dominant uncertainty source in the pooled decomposition. Third, despite having a lower per-case correlation than the between-only variant ($r = 0.243$ vs.\ $0.278$), the pooled uncertainty achieves the best detection performance (MRE 2.19\,mm) and the lowest standard deviation (1.22\,mm). This indicates that the within-student component, while near-uninformative as a standalone signal, provides a complementary regularization effect during training that stabilizes predictions when combined with the between-student term.
+
+\paragraph{Label efficiency.}
+To assess how TRUST's gains scale with the amount of labeled data available, we retrain both the supervised baseline (Ma et al.~\cite{Ma2023_aortic_landmarks}) and the full TRUST framework using labeled subsets of $|\mathcal{D}_L| \in \{20, 50, 100\}$ volumes, while keeping the unlabeled pool fixed at $|\mathcal{D}_U|=620$ for TRUST. Table~\ref{tab:label_efficiency} reports the results.
+
+\begin{table}[t]
+\centering
+\caption{Label efficiency. TRUST is evaluated against the supervised baseline (Ma et al.) at three labeled-volume counts, with the unlabeled pool fixed at 620 volumes. $\Delta$MRE is the absolute MRE reduction relative to the supervised baseline at the same $|\mathcal{D}_L|$.}
+\label{tab:label_efficiency}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{l c c c c c}
+\toprule
+Method & $|\mathcal{D}_L|$ & MRE (mm)$\downarrow$ & \scriptsize SDR$_{2.0}$ & \scriptsize SDR$_{4.0}$ & $\Delta$MRE \\
+\midrule
+Supervised & 20  & 4.16 & 13.33 & 55.00 & --- \\
+TRUST      & 20  & 3.86 & 18.33 & 62.33 & $-$0.30 \\
+\midrule
+Supervised & 50  & 3.55 & 23.67 & 66.33 & --- \\
+TRUST      & 50  & 3.34 & 28.67 & 66.33 & $-$0.21 \\
+\midrule
+Supervised & 100 & 2.79 & 39.00 & 80.33 & --- \\
+\textbf{TRUST} & \textbf{100} & \textbf{2.19} & \textbf{50.67} & \textbf{92.33} & \textbf{$-$0.60} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+TRUST outperforms the supervised baseline at every label count tested, confirming the framework's general benefit. However, the relative gain is non-monotone: $-$0.30\,mm at $|\mathcal{D}_L|=20$, $-$0.21\,mm at $|\mathcal{D}_L|=50$, and $-$0.60\,mm at $|\mathcal{D}_L|=100$. This contrasts with the conventional semi-supervised-segmentation narrative in which relative gains peak at the lowest label counts~\cite{Yu2019_uncertainty_aware,Wang2022_u2pl}. We attribute this pattern to the different scaling behaviors of the two paradigms: supervised performance improves steeply from 20 to 50 labels as the model transitions out of a severely data-starved regime, compressing the relative headroom for SSL; from 50 to 100 labels, supervised gains diminish while TRUST's uncertainty-guided modules---which require a minimum pseudo-label quality to be effective---fully activate, yielding the largest absolute gain. A contributing factor is that the cross-student disagreement component of the unified uncertainty~\eqref{eq:uncertainty_decomp} requires sufficient model diversity to provide a meaningful reliability signal; at very low label counts, both students converge to similar (poor) solutions, reducing the effectiveness of the cross-student decomposition. These observations suggest that TRUST's multi-component design is most beneficial when a moderate labeled-supervision budget is available to bootstrap reliable pseudo-labels and uncertainty estimates, and that future work on extreme-low-label regimes should explore single-teacher alternatives or auxiliary label-efficient priors alongside CPS.
+
+\paragraph{Unlabeled-pool size.}
+To directly assess whether the semi-supervised gain scales with the available unlabeled pool, we keep the labeled set fixed at $|\mathcal{D}_L|=100$ and vary $|\mathcal{D}_U| \in \{0, 100, 300, 620\}$, where $|\mathcal{D}_U|=0$ corresponds to the supervised counterpart without any unlabeled training. Table~\ref{tab:unlabeled_pool} shows a monotonic improvement as more unlabeled volumes are used: the gain is modest at 100 unlabeled volumes (MRE 2.79$\to$2.74\,mm), becomes clearer at 300 volumes (2.55\,mm), and reaches the full TRUST result at 620 volumes (2.19\,mm, a 21.5\% reduction relative to $|\mathcal{D}_U|=0$). SDR$_{2.0}$ and SDR$_{4.0}$ follow the same trend, increasing by 11.67 and 12.00 percentage points, respectively, from 0 to 620 unlabeled volumes. These results support that the unlabeled pool itself, not only the architectural components, contributes materially to TRUST's final performance.
+
+\begin{table}[t]
+\centering
+\caption{Effect of unlabeled-pool size with the labeled set fixed at $|\mathcal{D}_L|=100$. $\Delta$MRE is the absolute MRE change relative to the supervised counterpart with $|\mathcal{D}_U|=0$.}
+\label{tab:unlabeled_pool}
+\setlength{\tabcolsep}{5pt}
+\footnotesize
+\begin{tabular}{c c c c c}
+\toprule
+$|\mathcal{D}_U|$ & MRE (mm)$\downarrow$ & \scriptsize SDR$_{2.0}$ & \scriptsize SDR$_{4.0}$ & $\Delta$MRE \\
+\midrule
+0   & 2.79 & 39.00 & 80.33 & --- \\
+100 & 2.74 & 40.33 & 81.67 & $-$0.05 \\
+300 & 2.55 & 44.67 & 86.00 & $-$0.24 \\
+\textbf{620} & \textbf{2.19} & \textbf{50.67} & \textbf{92.33} & \textbf{$-$0.60} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ---------------------------------------------------------------------------
+\subsection{Per-Landmark and Clinical Analysis}
+\label{sec:perlandmark}
+
+\paragraph{Per-landmark detection accuracy.}
+Table~\ref{tab:perlandmark} reports per-landmark MRE for TRUST and the supervised-only baseline, grouped by the clinical functions defined in Fig.~\ref{fig:anatomy}: annular hinges, commissures, center point, membranous septum point, and coronary ostia.
+
+\begin{table}[t]
+\centering
+\caption{Per-landmark MRE (mm) grouped by clinical function. NCC, LCC, and RCC denote non-coronary, left coronary, and right coronary cusps; LCO and RCO denote left and right coronary ostia.}
+\label{tab:perlandmark}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l l c c}
+\toprule
+Group & Landmark & Supervised & TRUST \\
+\midrule
+\multirow{3}{*}{Annular}    & $P_0$ (NCC Hinge) & 2.95$\pm$1.61 & 2.41$\pm$1.24 \\
+                             & $P_1$ (RCC Hinge) & 2.61$\pm$1.45 & 2.47$\pm$1.14 \\
+                             & $P_2$ (LCC Hinge) & 2.20$\pm$1.15 & 1.87$\pm$0.86 \\
+\midrule
+\multirow{3}{*}{Commissure} & $P_3$ (NCC--RCC)  & 2.74$\pm$1.43 & 2.02$\pm$1.10 \\
+                             & $P_4$ (RCC--LCC)  & 2.62$\pm$1.84 & 2.19$\pm$0.94 \\
+                             & $P_5$ (LCC--NCC)  & 2.91$\pm$1.52 & 1.84$\pm$0.89 \\
+\midrule
+Center    & $P_6$ (Central)   & 1.91$\pm$0.81 & 1.58$\pm$0.64 \\
+\midrule
+Septum    & $P_7$ (Membranous septum)  & 3.64$\pm$1.66 & 3.29$\pm$1.88 \\
+\midrule
+\multirow{2}{*}{Coronary}   & $P_8$ (LCO)      & 2.73$\pm$1.71 & 2.17$\pm$1.29 \\
+                             & $P_9$ (RCO)      & 3.57$\pm$2.37 & 2.10$\pm$0.94 \\
+\midrule
+\multicolumn{2}{l}{\textbf{Overall}}            & 2.79$\pm$1.68 & 2.19$\pm$1.22 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figs/per_landmark_grouped_bar.pdf}
+\caption{Per-landmark localization error (MRE $\pm$ standard deviation) for the supervised baseline and TRUST. Dashed horizontal lines indicate the overall MRE for each method. Landmarks are grouped by clinical function (shaded background). All 10 landmarks improve under TRUST relative to the supervised baseline.}
+\label{fig:perlandmark}
+\end{figure*}
+
+Several patterns emerge from Table~\ref{tab:perlandmark}, Fig.~\ref{fig:perlandmark}, and the qualitative examples in Fig.~\ref{fig:qualitative}. First, TRUST delivers its largest gains on precisely the landmarks that motivated its design: the membranous septum point $P_7$ improves by 9.6\% (3.64$\to$3.29\,mm) and the right coronary ostium $P_9$ improves by 41.2\% (3.57$\to$2.10\,mm). Commissures ($P_3$--$P_5$) see uniform reductions of 16--37\%, reflecting the Topo-GCN's effectiveness at exploiting the strong hinge--commissure alternating structure of the annular ring. The central point $P_6$, already the easiest landmark under supervision, further improves to 1.58\,mm and remains the lowest-error landmark in the set.
+
+Second, the two coronary ostia---introduced in this work and absent from prior supervised pipelines such as Ma et al.~\cite{Ma2023_aortic_landmarks}---both fall below 2.20\,mm in TRUST. \textcolor{red}{This per-landmark accuracy is a necessary precondition for coronary-height screening at the SCCT-endorsed 12\,mm reference cutoff, although the threshold-level analysis (Table~\ref{tab:clinical_discordance}) shows that the present cohort contains few below-cutoff ostia (8 for LCO, only 1 for RCO), so a definitive per-ostium sensitivity assessment will require an external cohort enriched in low-coronary-height anatomies. We therefore frame the extension from 8 to 10 landmarks as a step toward automated coronary-height measurement rather than a finished demonstration of clinical coronary-risk stratification.}
+
+Third, all 10 landmarks improve under TRUST relative to the supervised baseline, with per-landmark gains ranging from $-5.4\%$ ($P_1$ RCC hinge, the smallest) to $-41.2\%$ ($P_9$ RCO, the largest). This uniform improvement, combined with the overall standard-deviation reduction from 1.68 to 1.22\,mm, indicates that the multi-component design produces consistent gains across the full landmark set rather than trading off any subset against another.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figs/qualitative_results.pdf}
+\caption{Qualitative landmark detection results on three representative test cases of increasing overall MRE. Green circles: ground-truth landmarks; red squares: TRUST predictions; stars: membranous septum point $P_7$; diamonds: coronary ostia $P_8$/$P_9$. The yellow dashed line indicates the $P_7$ error vector. Each case is shown in axial view at the annular plane level. Case~A (MRE 1.46\,mm, $P_7$ error 1.5\,mm) shows near-perfect overlap across all landmarks. Case~B (MRE 2.13\,mm, $P_7$ error 2.5\,mm) is close to the cohort mean and exhibits mild residual deviations. Case~C (MRE 2.59\,mm, $P_7$ error 3.8\,mm) is the worst-MRE case in the test set; the error is distributed across several landmarks rather than concentrated on any single one.}
+\label{fig:qualitative}
+\end{figure*}
+
+\paragraph{Clinical downstream validation.}
+Beyond per-landmark geometric accuracy, we evaluate whether the predicted landmarks preserve six clinically meaningful measurements organized along three principal TAVI planning pillars. Pillar~I---\emph{conduction disturbance risk prediction}---comprises (i)~MSL and (ii)~per-cusp device-landing-zone (DLZ) calcification volume; \textcolor{red}{this organization mirrors the preprocedural CT framework articulated by Lemarchand et al.~\cite{Lemarchand2023_nocd,Lemarchand2026_cusp_overlap}, who identify patient-specific MSL and aortic-valve-complex calcification as important determinants of post-TAVI conduction outcomes.} \textcolor{red}{Pillar~II---\emph{coronary safety assessment}---comprises (iii)~coronary ostium height, a screening measurement used in coronary obstruction assessment.} Pillar~III---\emph{device selection and procedural deployment}---comprises (iv)~3-cusp annular diameter, (v)~annular cross-sectional area for prosthesis sizing, and (vi)~C-arm fluoroscopic angulation for intra-procedural valve deployment. \textcolor{red}{For each measurement we compute both ground-truth and predicted values from the corresponding landmark subsets and report two layers of agreement: (a)~continuous agreement via mean absolute error (MAE), Pearson correlation, intraclass correlation coefficient (ICC), and Bland--Altman limits of agreement (LoA; Table~\ref{tab:clinical_continuous}); and (b)~threshold-based discordance at literature-reported cutoffs where available, using these cutoffs as model-evaluation probes rather than clinical decision rules (Table~\ref{tab:clinical_discordance}).}
+
+\paragraph{MSL.}
+MSL is the perpendicular distance from the membranous septum point $P_7$ to the annular plane fitted through the three hinge points $P_0$, $P_1$, $P_2$:
+\begin{equation}
+  \text{MSL} = \left|(p_7 - p_0) \cdot \hat{n}\right|,\quad
+  \hat{n} = \frac{(p_1-p_0) \times (p_2-p_0)}{\|(p_1-p_0) \times (p_2-p_0)\|}.
+  \label{eq:msl}
+\end{equation}
+\textcolor{red}{A short MSL is an independent predictor of new-onset conduction disturbances after TAVI~\cite{Hamdan2015_msl_avblock,Maeno2017_pacemaker_tavr}. Following the cut points reported by Jilaihawi et al.~\cite{Jilaihawi2019_msl} and discussed by Lemarchand et al.~\cite{Lemarchand2023_nocd}, we use the 2\,mm and 5\,mm thresholds as analytical MSL strata rather than standalone clinical risk categories: short (MSL $\leq 2$\,mm), intermediate ($2 < \text{MSL} \leq 5$\,mm), and long (MSL $> 5$\,mm). Because the intermediate stratum spans only a 3\,mm window---comparable to the typical landmark detection error---we additionally report the rate of extreme-tier shifts (short $\leftrightarrow$ long), which tests whether localization error changes the threshold interpretation by more than one adjacent stratum.}
+
+% Jilaihawi2019_msl bib entry added 2026-04-13
+
+\paragraph{Per-cusp device-landing-zone calcification.}
+As the second principal preprocedural CT-derived predictor of NOCD~\cite{Lemarchand2023_nocd}, we quantify the calcification volume within each cusp's device-landing zone (DLZ). The DLZ is defined as the slab extending $d_{\text{DLZ}} = 5$\,mm below the annular plane along the inverse plane normal $-\hat{n}$ (Eq.~\ref{eq:msl}), bounded radially by $R_{\max} = 1.2\,R_{\triangle}$ from the annular center $C_{\text{ann}} = (P_0 + P_1 + P_2)/3$, where $R_{\triangle}$ denotes the circumradius of the hinge triangle $P_0 P_1 P_2$. Within this slab, the in-plane projections of the commissures $P_3$, $P_4$, $P_5$ partition the annular ring into three angular sectors, each containing exactly one hinge point and corresponding to one cusp: NCC (sector containing $P_0$), RCC (sector containing $P_1$), and LCC (sector containing $P_2$). The per-cusp calcification volume is then
+\begin{equation}
+  V_k = \!\!\!\sum_{\mathbf{p}\,\in\,\Omega_k}\!\!\! \mathbb{I}\!\left\{\rho(\mathbf{p}) > \tau_{\mathrm{HU}}\right\}\, v_{\mathrm{vox}}, \quad k\in\{\text{NCC, RCC, LCC}\},
+  \label{eq:dlz_calc}
+\end{equation}
+where $\Omega_k$ is the cusp-$k$ DLZ wedge, $\rho(\mathbf{p})$ is the Hounsfield-unit (HU) value at voxel $\mathbf{p}$, $\tau_{\mathrm{HU}} = 800$\,HU is the standard calcification threshold for contrast-enhanced computed tomography angiography (CTA), and $v_{\mathrm{vox}}$ is the voxel volume. This decomposition follows Maeno et al.~\cite{Maeno2017_pacemaker_tavr}, who established NCC-DLZ calcification as an independent predictor of pacemaker implantation, and Mauri et al.~\cite{Mauri2016_lvot_calcification}, who identified left-ventricular outflow tract calcification beneath the left and right coronary cusps as independent predictors of NOCD. Because cutoff values reported by Mauri et al. (LCC $>$ 13.7\,mm$^3$, RCC $>$ 4.8\,mm$^3$) were derived under different segmentation conventions and are not directly transferable to our protocol, we report continuous agreement only.
+
+\paragraph{Coronary ostium height.}
+Coronary height is the perpendicular distance from each coronary ostium ($P_8$ for LCO, $P_9$ for RCO) to the annular plane, computed along the plane normal $\hat{n}$ of Eq.~\eqref{eq:msl}:
+\begin{equation}
+  h_{\text{LCO}} = \left|(p_8 - p_0) \cdot \hat{n}\right|, \quad
+  h_{\text{RCO}} = \left|(p_9 - p_0) \cdot \hat{n}\right|.
+  \label{eq:coronary_height}
+\end{equation}
+\textcolor{red}{Per the Society of Cardiovascular Computed Tomography (SCCT) 2019 expert consensus~\cite{Blanke2019_scct_tavi_ct}, an ostium height below 12\,mm (together with a sinus of Valsalva diameter below 30\,mm) indicates increased risk of coronary obstruction, a rare (${\sim}0.66\%$) but often fatal complication with a reported 30-day mortality of up to 40.9\%. Because coronary obstruction risk depends on multiple anatomical factors and no absolute height threshold contraindicates the procedure~\cite{Blanke2019_scct_tavi_ct}, we use the 12\,mm cutoff only as a reference threshold for model evaluation, flagging each ostium as below-cutoff ($h < 12$\,mm) or above-cutoff ($h \geq 12$\,mm). Because false-negative threshold crossings (ground truth below the cutoff but prediction above it) would be undesirable for a screening measurement, we report sensitivity to below-cutoff ostia.}
+
+\paragraph{Annular diameter for prosthesis sizing.}
+Clinical prosthesis sizing typically relies on annular area or perimeter obtained from full-contour annular tracing~\cite{Blanke2019_scct_tavi_ct}, which requires 8--12 points along the annular ring and cannot be derived from three hinge points alone. We approximate the annular diameter as the diameter of the circle circumscribing the three hinge points:
+\begin{equation}
+  D_{\text{circ}} = 2 R_{\triangle},
+  \label{eq:dcirc}
+\end{equation}
+where $R_{\triangle}$ is the hinge-triangle circumradius introduced earlier. Under the simplifying assumption of a circular annulus, $D_{\text{circ}}$ is equivalent to both the area-derived diameter ($2\sqrt{A/\pi}$) and the perimeter-derived diameter ($C/\pi$) used by the two dominant TAVI sizing conventions---Edwards SAPIEN (area-based) and Medtronic Evolut (perimeter-based). The circumscribed-circle formulation also places $D_{\text{circ}}$ within the typical clinical range of annular diameters (20--30\,mm), allowing meaningful comparison with prosthesis sizing bins. We compare $D_{\text{circ}}$ against the sizing bins 23, 26, and 29\,mm common to both manufacturers and report the fraction of cases where TRUST-derived and ground-truth-derived $D_{\text{circ}}$ fall into different bins. An alternative formulation using the mean pairwise hinge distance~\cite{Lalys2019_tavi_segmentation} is discussed as a methodological comparison in Section~\ref{sec:discussion}.
+
+\paragraph{C-arm fluoroscopic angulation.}
+{\color{red} Among the family of C-arm angles parallel to the annular plane (so that the three hinges project onto a single line), TAVI deployment requires the unique angle in which the LCC and RCC hinges further overlap with each other---the \emph{cusp-overlap} projection (originally described by Tang et al.~\cite{Tang2018_cusp_overlap_intro} for self-expanding transcatheter aortic valve replacement; later evaluated in contemporary clinical cohorts~\cite{Pascual2022_cusp_overlap,Lemarchand2026_cusp_overlap}) and can facilitate higher implantation relative to patient-specific MSL. We therefore treat cusp-overlap angulation as a procedural-planning measurement rather than a direct predictor of conduction outcomes.} The cusp-overlap beam direction must (i)~lie in the annular plane and (ii)~be perpendicular to the LCC--RCC axis $P_2 - P_1$:
+\begin{equation}
+  \hat{d} = \frac{\hat{n} \times (P_2 - P_1)}{\| \hat{n} \times (P_2 - P_1) \|},
+  \label{eq:cusp_overlap}
+\end{equation}
+oriented so that the projection points anteriorly. Following the standard CT-to-fluoroscopy mapping~\cite{Achenbach2013_annular_plane,Arnold2012_carm_projection}, the corresponding angles are
+\begin{align}
+  \theta_{\text{LAO/RAO}} &= \operatorname{atan2}(\hat{d}_x,\, \hat{d}_y), \\
+  \theta_{\text{CRA/CAU}} &= \operatorname{atan2}\!\Bigl(\hat{d}_z,\, \sqrt{\hat{d}_x^2 + \hat{d}_y^2}\Bigr),
+  \label{eq:carm}
+\end{align}
+where LAO/RAO denotes left/right anterior oblique angulation and CRA/CAU denotes cranial/caudal angulation; positive $\theta_{\text{LAO/RAO}}$ denotes LAO and positive $\theta_{\text{CRA/CAU}}$ denotes cranial angulation. Accurate pre-procedural prediction of cusp-overlap angles reduces intra-operative contrast usage and aortographic adjustments, a clinically important benefit for patients with impaired renal function~\cite{Gurvitch2010_tavi_angulation}. Because C-arm angulation does not have an established discrete risk threshold, we report only continuous agreement for both angles.
+
+\begin{table}[t]
+\centering
+\caption{Continuous agreement between TRUST-predicted and ground-truth-derived clinical measurements. MAE: mean absolute error; std: standard deviation; $r$: Pearson correlation; ICC(2,1): intraclass correlation coefficient (two-way random, single measurement); 95\% LoA: Bland--Altman limits of agreement.}
+\label{tab:clinical_continuous}
+\setlength{\tabcolsep}{2pt}
+\footnotesize
+\begin{tabular}{l c c c c}
+\toprule
+Measurement & MAE\,$\pm$\,std & $r$ & ICC & 95\% LoA \\
+\midrule
+MSL (mm)                  & 1.72\,$\pm$\,1.54 & 0.33 & 0.32 & [$-$4.70,\,$+$4.41] \\
+DLZ calc.\ NCC (mm$^3$)   & 5.5\,$\pm$\,18.1  & 0.999 & 0.986 & [$-$31.8,\,$+$40.5]   \\
+DLZ calc.\ LCC (mm$^3$)   & 7.8\,$\pm$\,21.0 & 0.998 & 0.988 & [$-$36.6,\,$+$48.1]   \\
+DLZ calc.\ RCC (mm$^3$)   & 9.9\,$\pm$\,20.7 & 0.986 & 0.986 & [$-$43.9,\,$+$46.2]   \\
+Coronary h.\ LCO (mm)     & 1.71\,$\pm$\,1.55 & 0.52 & 0.48 & [$-$5.08,\,$+$3.43] \\
+Coronary h.\ RCO (mm)     & 1.67\,$\pm$\,1.25 & 0.71 & 0.71 & [$-$4.11,\,$+$4.15] \\
+Annular $D_{\text{circ}}$ (mm)   & 0.83\,$\pm$\,0.55 & 0.83 & 0.83 & [$-$1.70,\,$+$2.15] \\
+Annular area approx.\ (mm$^2$) & 43.1\,$\pm$\,28.0 & 0.87 & 0.71 & [$-$102.2,\,$+$20.3] \\
+C-arm LAO/RAO ($^\circ$)  & 6.7\,$\pm$\,5.0 & 0.79 & 0.71 & [$-$8.3,\,$+$18.3] \\
+C-arm CRA/CAU ($^\circ$)  & 4.8\,$\pm$\,3.2 & 0.72 & 0.68 & [$-$10.1,\,$+$12.4]   \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{\textcolor{red}{Threshold-based evaluation at literature-reported cutoffs, used here as model-evaluation probes rather than clinical decision rules. For the annular circumdiameter, bins correspond to standard TAVI prosthesis sizes (Edwards SAPIEN / Medtronic Evolut). Sens. denotes sensitivity to below-cutoff cases; C-arm angulation lacks a discrete clinical threshold and is omitted.}}
+\label{tab:clinical_discordance}
+\setlength{\tabcolsep}{3pt}
+\footnotesize
+\begin{tabular}{l l c}
+\toprule
+Measurement & Threshold(s) & Discordance / key metric \\
+\midrule
+MSL                   & \textcolor{red}{2\,/\,5\,mm strata}              & \textcolor{red}{46.7\%; 0\% extreme} \\
+Coronary h.\ LCO      & 12\,mm                            & 23.3\%; Sens.\ 75.0\%     \\
+Coronary h.\ RCO      & 12\,mm                            & 6.7\%; Sens.\ 0.0\% (n$_+$=1) \\
+Annular $D_{\text{circ}}$ & 23\,/\,26\,/\,29\,mm bins     & 23.3\%; 0 cases $|\Delta|\!\geq\!2$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{MSL results and interpretation.}
+\textcolor{red}{Continuous agreement between predicted and ground-truth MSL (Table~\ref{tab:clinical_continuous}) shows a low mean error but weak rank-order correlation: MAE 1.72$\pm$1.54\,mm, Pearson $r = 0.33$, ICC(2,1) $= 0.32$, with 95\% Bland--Altman limits of $[-4.70, +4.41]$\,mm and a near-zero systematic bias of $-0.14$\,mm. At the Jilaihawi/Lemarchand 2\,mm and 5\,mm MSL cut points~\cite{Jilaihawi2019_msl,Lemarchand2023_nocd}, 46.7\% of cases fall into a different MSL threshold stratum than the ground truth (Table~\ref{tab:clinical_discordance}, 95\% Clopper--Pearson CI [28.3, 65.7]), with zero extreme-tier shifts between the short and long strata (0/30, 95\% CI [0.0, 11.6]). All 14 discordant cases involve single-tier shifts; the directions are roughly balanced (8 toward shorter-MSL strata: 7 long$\to$intermediate and 1 intermediate$\to$short; 6 toward longer-MSL strata: 5 intermediate$\to$long and 1 short$\to$intermediate), consistent with the near-zero systematic bias ($-0.14$\,mm). The intermediate stratum spans a 3\,mm window comparable to the typical landmark localization error, so borderline cases near either threshold can shift between adjacent strata under small perturbations; by contrast, an extreme jump (short $\leftrightarrow$ long) would require an MSL error exceeding 3\,mm, which was not observed in any of the 30 test cases.}
+
+\paragraph{Per-cusp DLZ calcification results and interpretation.}
+Per-cusp DLZ calcification volumes exhibit the strongest agreement of any downstream measurement reported in this study (Table~\ref{tab:clinical_continuous}). Pearson correlations exceed 0.98 across all three cusps (NCC $r = 0.999$, LCC $r = 0.998$, RCC $r = 0.986$, all $p < 0.001$), with corresponding ICC(2,1) values of 0.986, 0.988, and 0.986. Mean absolute errors range from 5.5\,mm$^3$ (NCC) to 9.9\,mm$^3$ (RCC) and remain small relative to the broad ground-truth volume distribution (NCC range 0--478\,mm$^3$, LCC 0--643\,mm$^3$, RCC 0--679\,mm$^3$, total range 0--1638\,mm$^3$). This robustness reflects the focal nature of aortic root calcification: small commissure localization errors translate into small angular boundary shifts of the cusp wedge, but because calcium nuclei are spatially sparse and highly concentrated, most boundary perturbations sweep through non-calcified regions and leave the integrated volume nearly unchanged. All three cusps share the same bias direction (NCC $+4.34$\,mm$^3$, LCC $+5.76$\,mm$^3$, RCC $+1.16$\,mm$^3$, all positive), indicating a slight over-prediction of cusp-wedge volumes; the cross-measurement bias signature is analyzed jointly in Section~\ref{sec:discussion}. Together with the MSL analysis, the per-cusp DLZ calcification quantification provides a complete preprocedural CT instantiation of the Lemarchand NOCD risk framework~\cite{Lemarchand2023_nocd}, with both pillars demonstrating that TRUST-derived landmarks support the standard preprocedural NOCD risk assessment workflow.
+
+\paragraph{Coronary ostium height results and interpretation.}
+Table~\ref{tab:clinical_continuous} shows that the LCO and RCO heights exhibit comparable continuous agreement (MAE 1.71\,mm and 1.67\,mm respectively, both close to the underlying per-landmark errors for $P_8$ and $P_9$ reported in Table~\ref{tab:perlandmark}), with ICC values of 0.48 and 0.71. Notably, RCO exhibits a near-zero systematic bias ($+0.02$\,mm) and a symmetric 95\% LoA, indicating that the annular plane fitted through $P_0$--$P_2$ is well-registered relative to the RCO side. \textcolor{red}{LCO displays a mild systematic under-prediction of $-0.83$\,mm; for a screening measurement, this means TRUST tends to place the LCO slightly closer to the annular plane than the ground truth, biasing the threshold screen toward increased vigilance rather than missed below-cutoff measurements.}
+
+\textcolor{red}{At the SCCT-endorsed 12\,mm reference cutoff~\cite{Blanke2019_scct_tavi_ct}, the two ostia exhibit different statistical regimes due to their differing below-cutoff counts. LCO contains 8 below-cutoff cases (ground-truth height $<12$\,mm) in the test set, of which TRUST correctly flags 6 (sensitivity 75.0\%, 95\% Clopper--Pearson CI [34.9, 96.8]; specificity 77.3\% [54.6, 92.2]; overall discordance 23.3\% [9.9, 42.3]). RCO contains only 1 below-cutoff case in the present cohort, which TRUST misses (sensitivity 0.0\% [0.0, 97.5]; specificity 96.6\% [82.2, 99.9]; overall discordance 6.7\% [0.8, 22.1]). The single-positive-case constraint renders the RCO sensitivity estimate statistically uninformative (CI essentially $[0, 1]$), so per-ostium sensitivity comparison is not meaningful in this cohort; we report it for completeness only. Among all 3 false-negative threshold crossings observed across the two ostia, every case lies within 1\,mm of the 12\,mm cutoff (LCO: ground truth $=11.66$\,mm, prediction $=12.65$\,mm; LCO: ground truth $=11.27$\,mm, prediction $=14.83$\,mm; RCO: ground truth $=11.98$\,mm, prediction $=14.56$\,mm), so all missed below-cutoff cases reflect the landmark-resolution-limited boundary-crossing phenomenon rather than a genuine detection failure. The 95\% Bland--Altman limits (${\pm}5$\,mm for LCO, $\pm 4$\,mm for RCO) imply that any case with a coronary height within ${\pm}5$\,mm of the 12\,mm cutoff should be interpreted cautiously; a larger external cohort with more below-cutoff cases will be needed to establish definitive threshold sensitivity for both ostia.}
+
+\paragraph{Annular diameter results and interpretation.}
+Among all downstream measurements, the annular circumdiameter $D_{\text{circ}}$ shows the strongest continuous agreement (MAE 0.83\,$\pm$\,0.55\,mm, Pearson $r = 0.83$, ICC(2,1) $= 0.83$, 95\% LoA $[-1.70, +2.15]$\,mm). This is expected: $D_{\text{circ}}$ depends only on the three hinge points $P_0$--$P_2$, which are among the best-localized landmarks in both the supervised baseline and TRUST (Table~\ref{tab:perlandmark}), and errors in the individual hinge coordinates partially cancel when aggregated into a single scalar diameter. The systematic bias is negligible ($+0.23$\,mm), so $D_{\text{circ}}$ is not subject to the under-prediction concern observed for some other distance-based measurements.
+
+At the TAVI prosthesis sizing bins (23, 26, 29\,mm), 23.3\% of cases fall into a different bin than the ground truth (95\% Clopper--Pearson CI [9.9, 42.3]), and \emph{no} case exhibits a more-than-adjacent-bin shift ($|\Delta\text{bin}| \geq 2$; 0/30, 95\% CI [0.0, 11.6]). All 7 discordant cases involve single-bin shifts between adjacent sizes, mirroring the landmark-resolution-limited boundary-crossing phenomenon observed for both MSL and coronary height. In the present cohort, all 30 ground-truth diameters fall into the two smallest bins (19 in $<23$\,mm and 11 in $23$--$26$\,mm), so the analysis does not exercise the upper sizing range; a broader external cohort spanning the full prosthesis size spectrum will be needed for a complete validation. \textcolor{red}{Given the negligible systematic bias ($+0.23$\,mm), the practical implication is consistent across the threshold-based downstream analyses: TRUST-derived measurements show useful agreement under reference thresholds, while cases near threshold or sizing-bin boundaries still require expert review or intraoperative confirmation.}
+
+\begin{table*}[!t]
+\centering
+\color{red}
+\caption{Single-center multi-reader analysis on the same 30-case test set. Reader~A1 is the original reference used in the primary evaluation; Reader~A2 is a repeat annotation by the same reader, and Reader~B is an independent reader. TRUST-versus-A1 results are therefore not duplicated. Panel (a) reports MRE (mean $\pm$ standard deviation), full 10-landmark SDR, and the number of errors above 10\,mm. Panel (b) reports downstream MAE. Plane angle is the angular difference between annular-plane normals.}
+\label{tab:multi_reader}
+\setlength{\tabcolsep}{3pt}
+\scriptsize
+\begin{tabular}{l c c c c c c}
+\toprule
+\multicolumn{7}{l}{\textit{(a) Landmark localization}} \\
+Comparison & $P_0$--$P_7$ MRE & 10-point MRE & $P_8$--$P_9$ MRE & SDR$_{2.0}$ & SDR$_{4.0}$ & $>10$\,mm \\
+ & (mm) & (mm) & (mm) & (\%) & (\%) & points \\
+\midrule
+Reader~B vs.\ Reader~A2 & 2.750$\pm$2.420 & 2.587$\pm$2.287 & 1.934$\pm$1.499 & 48.67 & 84.67 & 5 \\
+TRUST vs.\ Reader~B & 3.155$\pm$2.396 & 3.213$\pm$2.457 & 3.448$\pm$2.696 & 32.67 & 77.33 & 7 \\
+TRUST vs.\ Reader~A2 & 2.719$\pm$1.653 & 2.813$\pm$1.892 & 3.191$\pm$2.626 & 39.00 & 81.00 & 3 \\
+\bottomrule
+\end{tabular}
+
+\vspace{3pt}
+
+\begin{tabular}{l c c c c c c c}
+\toprule
+\multicolumn{8}{l}{\textit{(b) Downstream measurements}} \\
+Comparison & MSL & $D_{\text{circ}}$ & 3-hinge area & LCO height & RCO height & Plane angle & DLZ total \\
+ & mm & mm & mm$^2$ & mm & mm & $^\circ$ & mm$^3$ \\
+\midrule
+Reader~B vs.\ Reader~A2 & 2.936 & 2.167 & 82.962 & 0.836 & 1.301 & 4.155 & 16.068 \\
+TRUST vs.\ Reader~B & 3.099 & 2.299 & 88.554 & 1.724 & 2.407 & 5.800 & 21.817 \\
+TRUST vs.\ Reader~A2 & 1.826 & 1.232 & 44.344 & 1.899 & 2.177 & 4.872 & 28.853 \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\paragraph{Annular cross-sectional area.}
+Beyond the 3-cusp circumdiameter, current SCCT guidelines~\cite{Blanke2019_scct_tavi_ct} recommend area-based sizing using the annular cross-sectional area derived from a manually drawn annular contour, which captures the elliptical and asymmetric geometry of the native annulus more faithfully than a circumscribed circle through three hinges. We evaluated this clinically important quantity in the subset with available manual contour annotations. The reference area was computed as the two-dimensional shoelace area of the Medical Imaging Interaction Toolkit (MITK) annular polygon in its own contour plane. Because TRUST predicts 10 landmarks rather than a dense annular contour, the prediction-side area was defined as the circular three-hinge approximation $A_{\text{circ}}^{\text{pred}} = \pi R_{\triangle,\text{pred}}^2$, where $R_{\triangle,\text{pred}}$ is the circumradius of the TRUST-predicted hinge triangle ($P_0$--$P_2$). Thus, this analysis tests whether the existing landmark set can approximate contour-derived sizing area, not whether TRUST directly predicts an annular contour. Among the 14 test cases with available annular-contour polygons, agreement was moderate: MAE $43.1 \pm 28.0$\,mm$^2$, Pearson $r = 0.87$, ICC(2,1) $= 0.71$, 95\% Bland--Altman limits $[-102.2, +20.3]$\,mm$^2$ (Table~\ref{tab:clinical_continuous}). Unlike the near-zero bias of $D_{\text{circ}}$, the point-derived area approximation exhibits a substantial systematic under-prediction (bias $-41.0$\,mm$^2$ on a manual-contour mean of $435$\,mm$^2$, a relative under-prediction of $\sim 9.4\%$). Mechanistically, this directional bias should be interpreted as the combined effect of representing an elliptical/asymmetric annulus with a circular three-point approximation and residual hinge-point localization error, rather than as a plane-projection effect. Clinically, landmark-only area estimates would therefore tend to recommend smaller-than-optimal valve sizes if used directly, so area-based sizing should continue to rely on manual contouring or intraoperative confirmation until TRUST is extended to direct annular-contour prediction. Because area-based sizing decisions in current TAVI workflows do not use a single binary threshold, we report only continuous agreement for this measurement.
+
+\paragraph{C-arm angulation results and interpretation.}
+The two cusp-overlap angles exhibit error characteristics in the same order: MAE $6.7 \pm 5.0^\circ$ for LAO/RAO ($r = 0.79$, ICC(2,1) $= 0.71$) and $4.8 \pm 3.2^\circ$ for CRA/CAU ($r = 0.72$, ICC $= 0.68$); see Table~\ref{tab:clinical_continuous}. Predicted angles span the clinically expected range (LAO/RAO ground truth $[-22^\circ, +38^\circ]$, CRA/CAU $[+13^\circ, +52^\circ]$) consistent with prior cusp-overlap fluoroscopic series~\cite{Pascual2022_cusp_overlap}. The agreement is weaker than that reported for the annular $D_{\text{circ}}$ measurement because the cusp-overlap formula relies on only two landmarks ($P_1$ and $P_2$) without averaging over the third hinge, so per-landmark localization noise propagates directly into the beam-direction estimate; this is consistent with five outlier cases in which $|\Delta\theta_{\text{LAO}}| \in [10^\circ, 15^\circ]$ correspond to elevated $P_1$/$P_2$ residuals. Both components show a positive bias ($+5.04^\circ$ LAO/RAO, $+1.15^\circ$ CRA/CAU). Despite these limitations, the absolute MAE of $6^\circ$ on both angles falls well within the $\pm 10^\circ$ working range that Arnold et al.~\cite{Arnold2012_carm_projection} reported as clinically usable for first-shot CT-derived TAVI projection (successful in 84\% of cases in their cohort), so TRUST-derived cusp-overlap angles can serve as a starting projection that is subsequently refined intra-operatively.
+
+\paragraph{\textcolor{red}{Single-center multi-reader analysis.}}
+\textcolor{red}{Table~\ref{tab:multi_reader} compares the independent Reader~B annotation, the Reader~A2 repeat annotation, and TRUST. Across all 10 landmarks, reader--reader disagreement is 2.587$\pm$2.287\,mm, compared with 3.213$\pm$2.457\,mm for TRUST versus Reader~B and 2.813$\pm$1.892\,mm for TRUST versus Reader~A2. The corresponding SDR$_{4.0}$ values are 84.67\%, 77.33\%, and 81.00\%, respectively. The gap is more pronounced for the newly added coronary ostia: Reader~B versus Reader~A2 yields 1.934$\pm$1.499\,mm over $P_8$--$P_9$, whereas TRUST reaches 3.448$\pm$2.696\,mm versus Reader~B and 3.191$\pm$2.626\,mm versus Reader~A2. These results place overall model performance near, but not at, the observed inter-reader agreement and identify the coronary ostia as the clearest remaining reader-referenced accuracy gap.}
+
+\textcolor{red}{The downstream results provide a complementary view. For MSL, $D_{\text{circ}}$, and circular area, TRUST versus Reader~A2 has lower MAE than Reader~B versus Reader~A2, while TRUST versus Reader~B is comparable to or slightly above the reader--reader discrepancy. This asymmetry indicates sensitivity to the chosen reference annotation. Coronary-height MAEs are consistently larger for model--reader comparisons (LCO 1.724--1.899\,mm; RCO 2.177--2.407\,mm) than for Reader~B versus Reader~A2 (0.836\,mm and 1.301\,mm). Annular-plane orientation remains close to the reader--reader level (4.872--5.800$^\circ$ vs.\ 4.155$^\circ$), whereas total DLZ MAE increases from 16.068\,mm$^3$ between readers to 21.817--28.853\,mm$^3$ for the model--reader comparisons.}
+
+
+% ============================================================================
+\section{Discussion}
+\label{sec:discussion}
+% ============================================================================
+
+The ablation study (Tables~\ref{tab:ablation}--\ref{tab:ablation_uncertainty}) reveals that the unified uncertainty mechanism is the single most impactful component of TRUST. In the cumulative ablation, activating uncertainty on top of all architectural modules yields a $-0.27$\,mm MRE reduction---larger than the combined contribution of vanilla HCO and Topo-GCN ($-0.06$ and $-0.03$\,mm) by a factor of three. More importantly, the uncertainty consumer sub-ablation (Table~\ref{tab:ablation_uncertainty}) shows that activating the uncertainty signal on top of already-present HCO and Topo-GCN modules yields an additional $-0.11$\,mm reduction (2.46 $\to$ 2.35\,mm), exceeding the modules' own standalone contribution of $-0.09$\,mm as vanilla components in the main ablation (2.55 $\to$ 2.46\,mm). This indicates that the architectural modules provide \emph{capacity} for improvement---frequency-domain feature propagation and graph-based structural reasoning---but this capacity is only fully realized when guided by a per-landmark reliability signal that distinguishes trustworthy predictions from noisy ones. In contrast, existing semi-supervised methods apply uncertainty to a single mechanism: Yu et al.~\cite{Yu2019_uncertainty_aware} use it for loss weighting, Wang et al.~\cite{Wang2022_u2pl} for pseudo-label selection. Our results suggest that a multi-consumer design, in which the same uncertainty estimate simultaneously shapes feature extraction, filters pseudo-supervision, and regulates structural refinement, yields benefits that exceed the sum of its parts in mean MRE while delivering the strongest variance reduction observed in the ablation.
+
+{\color{red} The clinical downstream results suggest that TRUST mainly produces boundary-level threshold discrepancies rather than systematic measurement failures: hinge-derived distance biases remain small (MSL: $-0.14$\,mm; LCO height: $-0.83$\,mm; RCO height: $+0.02$\,mm; annular $D_{\text{circ}}$: $+0.23$\,mm), no MSL discordance crosses between the shortest and longest strata, and no $D_{\text{circ}}$ case shifts by more than one sizing bin. The full 10-landmark multi-reader comparison provides a direct reference for annotation variability. Overall TRUST--reader MRE remains close to but above reader--reader disagreement, with the largest relative gap at the coronary ostia. For hinge-derived downstream measurements, agreement depends on the selected reader reference; for coronary heights, plane orientation, and total DLZ, model--reader MAEs also remain above the reader--reader values.}
+
+\subsection{Limitations}
+
+Several limitations warrant discussion. \textcolor{red}{First, the present test set and its multi-reader annotations remain single-center. Although an independent second reader and a repeat annotation by the original reader permit full 10-landmark and downstream comparisons, the analysis does not constitute external validation or an adjudicated consensus reference.} \textcolor{red}{The cohort also contains few below-cutoff ostia at the SCCT 12\,mm coronary-height reference threshold (8 for LCO, only 1 for RCO; Table~\ref{tab:clinical_discordance}), so the per-ostium threshold-sensitivity estimates carry wide binomial confidence intervals; in particular, RCO has only one positive case, rendering its sensitivity statistically uninformative. All three false-negative threshold crossings observed across the two ostia lie within 1\,mm of the 12\,mm cutoff and therefore reflect landmark-resolution-limited boundary crossing rather than genuine detection failures. A definitive assessment of both landmark accuracy and coronary-height screening will require multi-center external validation with an adjudicated multi-reader reference in a cohort enriched in low-coronary-height anatomies and other coronary-obstruction risk features.} Second, although the uncertainty mechanism is effective during training, we observe that TTA-based pooled uncertainty saturates at inference time due to the high confidence of the converged model, limiting its utility for inference-time quality assurance. Investigating complementary uncertainty estimators, such as heatmap entropy or evidential deep learning, may address this gap. Third, the cascaded design exposes Stage 2 to residual Stage 1 errors: in 2 of 300 landmark predictions on the test set (0.7\%), gross Stage 1 outliers shifted the ROI center sufficiently to place a ground-truth landmark outside the cropped volume, where Stage 2 cannot recover it; a dedicated recovery mechanism for cropped-out landmarks remains a methodological direction not addressed in this work. Finally, TRUST predicts a sparse 10-landmark representation rather than a full annular contour. Consequently, the annular diameter $D_{\text{circ}}$ and point-derived area estimate remain three-hinge circular approximations, whereas contemporary prosthesis sizing relies on contour-derived annular area and perimeter. Future work should extend TRUST toward dense annular-ring modeling or direct annular-contour prediction, followed by device-specific validation for prosthesis sizing.
+
+% ============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+We presented TRUST, a semi-supervised framework for detecting 10 aortic root landmarks from 3D CT volumes for TAVI planning. By using a unified per-landmark uncertainty signal to coordinate CPS loss weighting, UG-HCO feature propagation, and Topo-GCN refinement, TRUST achieves a cumulative MRE of 2.19\,mm, a 21.5\% reduction relative to the strongest fully supervised baseline while leveraging 620 unlabeled volumes. \textcolor{red}{Downstream evaluation across six TAVI planning measurements shows that TRUST-derived landmarks maintain clinically relevant measurement agreement under threshold-based evaluations, with no extreme MSL threshold shifts, no more-than-adjacent prosthesis-sizing shifts, and per-cusp calcification agreement above $r > 0.98$.} \textcolor{red}{A same-test-set full 10-landmark multi-reader analysis places model performance near, but not at, the observed reader--reader agreement and identifies the coronary ostia as the largest remaining reader-referenced accuracy gap. The main remaining needs are multi-center validation with adjudicated multi-reader references, inference-time uncertainty calibration, and direct annular-contour prediction to replace the current three-hinge circular area approximation.}
+
+\section*{Acknowledgment}
+% TODO
+
+\bibliographystyle{IEEEtran}
+\bibliography{Bibliography_base}
+
+\begin{IEEEbiographynophoto}{First A. Author}
+Biography placeholder.
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Second B. Author}
+Biography placeholder.
+\end{IEEEbiographynophoto}
+
+\begin{IEEEbiographynophoto}{Third C. Author Jr.}
+Biography placeholder.
+\end{IEEEbiographynophoto}
+
+\end{document}
