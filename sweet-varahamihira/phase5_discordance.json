@@ -1,0 +1,163 @@
+{
+  "msl": {
+    "n": 30,
+    "n_high_risk_gt": 2,
+    "n_intermediate_risk_gt": 14,
+    "n_low_risk_gt": 14,
+    "discordance_rate": 0.4666666666666667,
+    "discordance_ci": [
+      0.283418079183537,
+      0.6567447618392659
+    ],
+    "discordance_count": 14,
+    "critical_rate": 0.0,
+    "critical_ci": [
+      0.0,
+      0.11570330822202779
+    ],
+    "critical_count": 0,
+    "discordance_direction": {
+      "(np.str_('low'), np.str_('intermediate'))": 7,
+      "(np.str_('intermediate'), np.str_('low'))": 5,
+      "(np.str_('high'), np.str_('intermediate'))": 1,
+      "(np.str_('intermediate'), np.str_('high'))": 1
+    }
+  },
+  "lco": {
+    "n": 30,
+    "threshold": 12.0,
+    "n_gt_positive": 8,
+    "tp": 6,
+    "fn": 2,
+    "fp": 5,
+    "tn": 17,
+    "sensitivity": 0.75,
+    "sensitivity_ci": [
+      0.3491442055871758,
+      0.9681459737500557
+    ],
+    "specificity": 0.7727272727272727,
+    "specificity_ci": [
+      0.5462963763378781,
+      0.9217937396481075
+    ],
+    "overall_discordance": 0.23333333333333334,
+    "overall_discordance_ci": [
+      0.09933786495801974,
+      0.4228365229782195
+    ],
+    "fn_cases": [
+      {
+        "cid": 126,
+        "gt_height_mm": 11.659267912975183,
+        "pred_height_mm": 12.653099706237912,
+        "gap_to_threshold": 0.3407320870248167,
+        "kind": "near-threshold"
+      },
+      {
+        "cid": 127,
+        "gt_height_mm": 11.269264734703969,
+        "pred_height_mm": 14.832529586135651,
+        "gap_to_threshold": 0.7307352652960315,
+        "kind": "near-threshold"
+      }
+    ],
+    "fp_cases": [
+      {
+        "cid": 82,
+        "gt_height_mm": 12.979542875596287,
+        "pred_height_mm": 11.516532406880732
+      },
+      {
+        "cid": 92,
+        "gt_height_mm": 14.628611963822369,
+        "pred_height_mm": 11.844517054572563
+      },
+      {
+        "cid": 97,
+        "gt_height_mm": 12.069270203949094,
+        "pred_height_mm": 11.644358189724361
+      },
+      {
+        "cid": 103,
+        "gt_height_mm": 16.559617404508504,
+        "pred_height_mm": 10.225358039960808
+      },
+      {
+        "cid": 107,
+        "gt_height_mm": 14.071115243256374,
+        "pred_height_mm": 8.602254524901003
+      }
+    ]
+  },
+  "rco": {
+    "n": 30,
+    "threshold": 12.0,
+    "n_gt_positive": 1,
+    "tp": 0,
+    "fn": 1,
+    "fp": 1,
+    "tn": 28,
+    "sensitivity": 0.0,
+    "sensitivity_ci": [
+      0.0,
+      0.975
+    ],
+    "specificity": 0.9655172413793104,
+    "specificity_ci": [
+      0.822355704511277,
+      0.9991273531164201
+    ],
+    "overall_discordance": 0.06666666666666667,
+    "overall_discordance_ci": [
+      0.008178134460656307,
+      0.22073540152296187
+    ],
+    "fn_cases": [
+      {
+        "cid": 107,
+        "gt_height_mm": 11.975131733828684,
+        "pred_height_mm": 14.559479488548227,
+        "gap_to_threshold": 0.024868266171315767,
+        "kind": "near-threshold"
+      }
+    ],
+    "fp_cases": [
+      {
+        "cid": 92,
+        "gt_height_mm": 13.517012572007165,
+        "pred_height_mm": 11.530018597604654
+      }
+    ]
+  },
+  "d_circ": {
+    "n": 30,
+    "bin_counts_gt": {
+      "<23": 19,
+      "23": 11,
+      "26": 0,
+      "29+": 0
+    },
+    "bin_counts_pred": {
+      "<23": 16,
+      "23": 14,
+      "26": 0,
+      "29+": 0
+    },
+    "discordance_rate": 0.23333333333333334,
+    "discordance_ci": [
+      0.09933786495801974,
+      0.4228365229782195
+    ],
+    "discordance_count": 7,
+    "adjacent_shift_count": 7,
+    "adjacent_shift_rate": 0.23333333333333334,
+    "n_more_than_adjacent": 0,
+    "more_than_adjacent_rate": 0.0,
+    "more_than_adjacent_ci": [
+      0.0,
+      0.11570330822202779
+    ]
+  },
+  "note": "C-arm angles, DLZ calcification volumes, and annular area are continuous-only and have no established clinical threshold \u2014 discordance not reported."
+}
